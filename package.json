@@ -1,0 +1,14 @@
+{
+  "name": "ai-storytelling-lab-functions",
+  "version": "1.0.0",
+  "description": "Serverless functions for the AI Storytelling Lab.",
+  "main": "api.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-fetch": "^3.3.2"
+  }
+}
