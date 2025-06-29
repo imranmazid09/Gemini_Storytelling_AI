@@ -1498,14 +1498,27 @@
 
             elements.imagePromptsContainer.classList.toggle('hidden', globalState.imagePrompts.length === 0);
             elements.imagePromptRadioGroup.innerHTML = '';
-            globalState.imagePrompts.forEach((prompt, index) => {
+            // --- EDIT: Changed from innerHTML to robust element creation to fix special character bug. ---
+            globalState.imagePrompts.forEach((promptText) => {
                 const label = document.createElement('label');
                 label.className = 'flex items-start text-gray-700';
-                label.innerHTML = `
-                    <input type="radio" name="imagePromptSelect" class="form-radio h-5 w-5 text-purple-600 mt-1" value="${prompt}" ${globalState.selectedImagePrompt === prompt ? 'checked' : ''}>
-                    <span class="ml-3 flex-1">${prompt}</span>
-                `;
-                label.querySelector('input').addEventListener('change', (e) => updateState({ selectedImagePrompt: e.target.value }));
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = 'imagePromptSelect';
+                radio.className = 'form-radio h-5 w-5 text-purple-600 mt-1';
+                radio.value = promptText;
+                if (globalState.selectedImagePrompt === promptText) {
+                    radio.checked = true;
+                }
+                radio.addEventListener('change', (e) => updateState({ selectedImagePrompt: e.target.value }));
+
+                const span = document.createElement('span');
+                span.className = 'ml-3 flex-1';
+                span.textContent = promptText;
+
+                label.appendChild(radio);
+                label.appendChild(span);
                 elements.imagePromptRadioGroup.appendChild(label);
             });
             elements.customImagePrompt.value = globalState.selectedImagePrompt; // Ensure custom field reflects selection
