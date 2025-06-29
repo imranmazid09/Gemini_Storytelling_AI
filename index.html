@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Storytelling Lab</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for elements that Tailwind doesn't fully cover or for specific overrides */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for hidden/shown sections */
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out;
+        }
+        .collapsible-content.expanded {
+            max-height: 2000px; /* Large enough to accommodate content */
+            transition: max-height 0.7s ease-in;
+        }
+        textarea, input[type="text"], select {
+            border-radius: 0.5rem; /* Apply rounded corners */
+        }
+        /* Custom spinner for image generation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .animate-spin-custom {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 font-sans flex flex-col items-center py-8 px-4 text-gray-800">
+
+    <!-- Custom Message Modal -->
+    <div id="messageModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-xl p-6 shadow-lg max-w-sm w-full text-center">
+            <p id="messageText" class="text-lg font-semibold text-gray-800 mb-4"></p>
+            <button id="messageCloseButton" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-300 shadow-md">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <!-- Header Section -->
+    <header class="w-full max-w-5xl bg-white rounded-xl shadow-lg p-6 mb-8 text-center">
+        <h1 class="text-4xl font-extrabold text-indigo-700 mb-2 leading-tight">AI Storytelling Lab</h1>
+        <p class="text-xl text-gray-600">Unleash Your Creativity with Artificial Intelligence</p>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="w-full max-w-5xl space-y-8">
+
+        <!-- Guide to Using the Website (Collapsible) -->
+        <section class="bg-white rounded-xl shadow-lg p-6">
+            <h2 id="guideToggle" class="text-3xl font-bold text-gray-800 mb-4 cursor-pointer">
+                Guide to Using the AI Storytelling Lab
+                <span id="guideToggleIcon" class="ml-2 text-blue-500 text-lg">▼</span>
+            </h2>
+            <div id="guideContent" class="collapsible-content">
+                <p class="text-gray-700 mb-4 leading-relaxed">
+                    Welcome to the AI Storytelling Lab! This tool is designed to help you explore and develop stories using artificial intelligence as your creative assistant. Follow these steps to craft your narrative:
+                </p>
+                <ol class="list-decimal list-inside text-gray-700 space-y-4 pl-4">
+                    <li>
+                        <strong>Organizational Context & Scenario:</strong> Begin by selecting an organization type or providing a custom one. The AI will generate a tailored storytelling scenario (~150 words), including organizational identity, realistic setting, trigger event, stakeholder map, narrative stakes, strategic constraints, ethical/emotional layer, and a student prompt. You can generate multiple new scenarios to find one that fits your needs.
+                    </li>
+                    <li>
+                        <strong>Character Development:</strong> Start by defining your story's key characters.
+                        You can choose from classic archetypes or create a completely new, custom character.
+                        Enter a brief description, then click "Generate Details with AI."
+                        The AI will provide a comprehensive profile. **You can edit this generated text directly in the textbox.** To further refine the character, make your edits and then, importantly, **provide refinement instructions in the new input field** that appears before clicking "Refine Details with AI" again. This iterative process allows you to guide the AI towards your vision.
+                    </li>
+                    <li>
+                        <strong>Setting:</strong> Next, establish the time, place, and mood of your story.
+                        Provide initial inputs for the Time Period, Geographical Location, and Atmosphere/Mood.
+                        Click "Generate Setting Details with AI" to get an AI-powered description of your world.
+                        Like characters, **you can edit the AI's output in the textbox** and then **provide refinement instructions in the new input field** that appears before clicking "Refine Setting Details with AI" to iterate and perfect your setting.
+                    </li>
+                    <li>
+                        <strong>Storytelling Arcs:</strong> Choose a foundational narrative structure like the Three-Act Structure, Freytag's Pyramid, or the StoryBrand Framework.
+                        For each part of the chosen arc (e.g., Setup, Climax), provide your initial ideas. Then, use the "Expand [Part] with AI" button for each section to develop it further.
+                        Again, **the AI's suggestions are fully editable.** Refine any part by making changes and then **provide refinement instructions in the new input field** that appears before re-clicking "Refine [Part] with AI" to prompt further iteration.
+                    </li>
+                    <li>
+                        <strong> AI Powered Story:</strong> Once your characters, setting, and arc are established, you're ready to generate the full story.
+                        Select your desired Platform (e.g., Instagram, Blog post) and Tone/Style. If you select "Social media advertisement", you'll also choose Campaign Objectives.
+                        Crucially, select the desired Length (Short, Medium, Long) for your story.
+                        Click "Craft AI-Powered Story." The AI will attempt to weave all your previous inputs into a coherent narrative.
+                        **The generated story is fully editable.** You can make changes, add your own creative flair, and then **provide refinement instructions in the new input field** that appears before clicking "Refine Story with AI" to have the AI build upon your revisions.
+                    </li>
+                    <li>
+                        <strong> AI Powered Image Generation:</strong> To bring your story to life visually, this section allows you to generate images.
+                        First, click "Generate Image Prompts from Story" to have AI suggest visual concepts based on your created narrative.
+                        You can then select one of these prompts or edit it, or write an entirely custom image prompt in the textbox.
+                        **To refine the image prompts generated by AI, provide instructions in the new input field** that appears before clicking "Re-generate Image Prompts."
+                        Finally, click "Generate Image" to create a visual representation of your story. You can then download this image.
+                        This step helps you visualize and enhance the impact of your storytelling.
+                    </li>
+                    <li>
+                        <strong> Social Media Post Generator:</strong> After crafting your story and image, create a complete social media post.
+                        The AI will generate compelling copy, relevant hashtags, and a call to action based on your story, image, platform, and tone.
+                        **The generated post is fully editable.** This is the final output stage for the text content.
+                        You can then download the complete post—both the text and the image combined—as a single image file.
+                    </li>
+                </ol>
+                <p class="text-gray-700 mt-4 leading-relaxed">
+                    Remember, the AI is your collaborator. Don't hesitate to experiment, edit, and iterate to achieve your creative goals!
+                </p>
+            </div>
+        </section>
+
+        <!-- Element 1: Organizational Context Selector + AI Scenario Generator -->
+        <section id="orgContextSection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">1. Organizational Context & Scenario</h2>
+            <p class="text-gray-700 mb-4">
+                Set the stage for your storytelling by defining the organizational context. AI will generate a relevant scenario to guide your creative process.
+            </p>
+            <div class="mb-6">
+                <label for="org-type-select" class="block text-lg font-semibold text-gray-800 mb-2">Select Organization Type:</label>
+                <select
+                    id="org-type-select"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent transition duration-200 bg-white"
+                >
+                    <option value="">-- Select Type --</option>
+                    <option value="nonprofit">Nonprofits</option>
+                    <option value="for-profit-brands">For-Profit Brands</option>
+                    <option value="government-agencies">Government Agencies</option>
+                    <option value="educational-institutions">Educational Institutions</option>
+                    <option value="media-entertainment">Media & Entertainment</option>
+                    <option value="health-wellness">Health & Wellness Organizations</option>
+                    <option value="startups-tech">Startups / Tech Innovators</option>
+                    <option value="civic-grassroots">Civic / Grassroots Movements</option>
+                    <option value="faith-based">Faith-Based / Religious Organizations</option>
+                    <option value="hybrid-social">Hybrid Social Enterprises</option>
+                    <option value="other">Other (specify below)</option>
+                </select>
+                <p id="orgTypeDescription" class="text-sm text-gray-600 mt-1 italic"></p>
+            </div>
+            <div id="customOrgTypeInputContainer" class="mb-6 hidden">
+                <label for="custom-org-type" class="block text-lg font-semibold text-gray-800 mb-2">Specify Organization Type:</label>
+                <input
+                    type="text"
+                    id="custom-org-type"
+                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-500 focus:border-transparent transition duration-200"
+                    placeholder="e.g., Tech Startup, Local Bakery, Government Agency"
+                >
+            </div>
+            <div id="scenarioContextContainer" class="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200 text-gray-700 shadow-inner hidden">
+                <h4 class="font-semibold text-gray-700 mb-2">AI-Generated Scenario:</h4>
+                <textarea
+                    id="scenarioContext"
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 resize-y min-h-[120px]"
+                    readonly
+                ></textarea>
+            </div>
+            <button
+                id="generateScenarioBtn"
+                class="px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full bg-gray-700 hover:bg-gray-800"
+            >
+                <span id="generateScenarioBtnText">Generate Scenario with AI</span>
+                <span id="generateScenarioSpinner" class="hidden">
+                    <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+            </button>
+        </section>
+
+        <!-- Element 2: Character Development -->
+        <section id="characterSection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-green-600 mb-4">2. Character Development</h2>
+            <p class="text-gray-700 mb-4">
+                Define your story's characters using classic archetypes, or create a completely new one. Use AI to suggest details and **iteratively refine them by editing the generated text and clicking the button again.**
+            </p>
+
+            <div class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Add New Character</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label for="new-character-archetype" class="block text-sm font-medium text-gray-700 mb-1">Archetype:</label>
+                        <select id="new-character-archetype" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200 bg-white">
+                            <option value="">-- Select Archetype --</option>
+                            <option value="hero">The Hero</option>
+                            <option value="mentor">The Mentor</option>
+                            <option value="antagonist">The Antagonist / Shadow</option>
+                            <option value="ally">The Ally</option>
+                            <option value="herald">The Herald</option>
+                            <option value="threshold-guardian">The Threshold Guardian</option>
+                            <option value="shapeshifter">The Shapeshifter</option>
+                            <option value="trickster">The Trickster</option>
+                            <option value="custom">Create a new custom character</option>
+                        </select>
+                        <p id="newCharArchetypeDescription" class="text-sm text-gray-600 mt-1 italic"></p>
+                    </div>
+                    <div>
+                        <label for="new-character-name" class="block text-sm font-medium text-gray-700 mb-1">Character Name (Optional):</label>
+                        <input
+                            type="text"
+                            id="new-character-name"
+                            class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200"
+                            placeholder="e.g., Elara"
+                        >
+                    </div>
+                </div>
+                <label for="new-character-description" class="block text-sm font-medium text-gray-700 mb-1">Brief Description:</label>
+                <textarea
+                    id="new-character-description"
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition duration-200 resize-y min-h-[60px]"
+                    placeholder="e.g., A young sorceress haunted by a past mistake."
+                ></textarea>
+                <button id="addCharacterBtn" class="mt-4 px-6 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition duration-300 shadow-md transform hover:scale-105">
+                    Add Character
+                </button>
+            </div>
+
+            <div id="charactersList" class="space-y-4">
+                <p class="text-gray-500 italic text-center py-4">No characters added yet. Start by adding one above!</p>
+            </div>
+        </section>
+
+        <!-- Element 3: Setting -->
+        <section id="settingSection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-orange-600 mb-4">3. Setting</h2>
+            <p class="text-gray-700 mb-4">
+                Define the time and place where your story unfolds. Use AI to suggest descriptive details and **iteratively refine them by editing the generated text and clicking the button again.**
+            </p>
+            <div class="space-y-4 mb-4">
+                <div>
+                    <label for="setting-time" class="block text-lg font-semibold text-gray-800 mb-2">Time Period:</label>
+                    <input
+                        type="text"
+                        id="setting-time"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition duration-200"
+                        placeholder="e.g., Post-apocalyptic 22nd century, Victorian London, Mythical era"
+                    >
+                </div>
+                <div>
+                    <label for="setting-location" class="block text-lg font-semibold text-gray-800 mb-2">Geographical Location:</label>
+                    <input
+                        type="text"
+                        id="setting-location"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition duration-200"
+                        placeholder="e.g., A sprawling cyberpunk city, an isolated mountain monastery, the Amazon rainforest"
+                    >
+                </div>
+                <div>
+                    <label for="setting-mood" class="block text-lg font-semibold text-gray-800 mb-2">Atmosphere / Mood:</label>
+                    <input
+                        type="text"
+                        id="setting-mood"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition duration-200"
+                        placeholder="e.g., Grim and oppressive, whimsical and enchanting, tense and suspenseful"
+                    >
+                </div>
+            </div>
+            <div id="settingAIResponseContainer" class="mt-6 p-4 bg-gray-50 rounded-lg border border-orange-200 text-gray-700 shadow-inner hidden">
+                <h3 class="font-semibold text-orange-700 mb-2">AI-Generated Setting Details (Edit Below):</h3>
+                <textarea
+                    id="settingAIResponse"
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 resize-y min-h-[100px]"
+                ></textarea>
+                <div class="mt-3">
+                    <label for="setting-refine-instruction" class="block text-sm font-medium text-gray-700 mb-1">Refinement Instructions for AI (Optional):</label>
+                    <input
+                        type="text"
+                        id="setting-refine-instruction"
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 transition duration-200"
+                        placeholder="e.g., Add more gothic elements, describe the flora and fauna"
+                    >
+                </div>
+            </div>
+            <button
+                id="generateSettingDetailsBtn"
+                class="px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 mt-4 w-full bg-red-600 hover:bg-red-700"
+            >
+                <span id="generateSettingDetailsBtnText">Generate Setting Details with AI</span>
+                <span id="generateSettingSpinner" class="hidden">
+                    <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+            </button>
+        </section>
+
+        <!-- Element 4: Storytelling Arcs -->
+        <section id="arcsSection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-blue-600 mb-4">4. Storytelling Arcs</h2>
+            <p class="text-gray-700 mb-4">
+                Choose a classic storytelling structure and define its key parts. Use AI to expand on your ideas for each section and **iteratively refine them by editing the generated text and clicking the button again.**
+            </p>
+            <div class="mb-6">
+                <label for="arc-select" class="block text-lg font-semibold text-gray-800 mb-2">Select a Structure:</label>
+                <select id="arc-select" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 bg-white">
+                    <option value="">-- Select a Story Arc --</option>
+                    <option value="three-act">Three-Act Structure</option>
+                    <option value="freytag-pyramid">Freytag's Pyramid</option>
+                    <option value="storybrand">StoryBrand Framework</option>
+                </select>
+                <p id="arcStructureDescription" class="text-sm text-gray-600 mt-2 italic"></p>
+            </div>
+
+            <div id="arcPartsContainer" class="space-y-6">
+                <!-- Arc parts will be dynamically loaded here -->
+            </div>
+        </section>
+
+        <!-- Element 5: AI Powered Story -->
+        <section id="storySection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-indigo-700 mb-4">5. AI Powered Story</h2>
+            <p class="text-gray-700 mb-4">
+                Generate a complete story based on all your defined elements, then **iteratively refine it by editing the generated text and clicking the button again.**
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div>
+                    <label for="story-platform" class="block text-lg font-semibold text-gray-800 mb-2">Select Platform:</label>
+                    <select id="story-platform" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 bg-white">
+                        <option value="">-- Select Platform --</option>
+                        <option value="Instagram">Instagram</option>
+                        <option value="Twitter/X">Twitter/X</option>
+                        <option value="Facebook">Facebook</option>
+                        <option value="LinkedIn">LinkedIn</option>
+                        <option value="Blog post">Blog post</option>
+                        <option value="email">email</option>
+                        <option value="Social media advertisement">Social media advertisement</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="story-tone" class="block text-lg font-semibold text-gray-800 mb-2">Select Tone / Style:</label>
+                    <select id="story-tone" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 bg-white">
+                        <option value="">-- Select Tone/Style --</option>
+                        <option value="Humorous">Humorous</option>
+                        <option value="Dramatic">Dramatic</option>
+                        <option value="Thriller">Thriller</option>
+                        <option value="Inspirational">Inspirational</option>
+                        <option value="Academic">Academic</option>
+                        <option value="Conversational">Conversational</option>
+                        <option value="Mysterious">Mysterious</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="story-length" class="block text-lg font-semibold text-gray-800 mb-2">Select Length:</label>
+                    <select id="story-length" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 bg-white">
+                        <option value="">-- Select Length --</option>
+                        <option value="short">Short (approx. 75-150 words)</option>
+                        <option value="medium">Medium (approx. 150-250 words)</option>
+                        <option value="long">Long (approx. 250-350 words)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="campaignObjectivesContainer" class="mb-6 p-4 border border-gray-200 rounded-lg bg-gray-50 hidden">
+                <label class="block text-lg font-semibold text-gray-800 mb-2">Campaign Objectives:</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label class="inline-flex items-center text-gray-700">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 rounded" value="Brand Awareness">
+                        <span class="ml-2">Brand Awareness</span>
+                    </label>
+                    <label class="inline-flex items-center text-gray-700">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 rounded" value="Lead Generation">
+                        <span class="ml-2">Lead Generation</span>
+                    </label>
+                    <label class="inline-flex items-center text-gray-700">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 rounded" value="Product Launch">
+                        <span class="ml-2">Product Launch</span>
+                    </label>
+                    <label class="inline-flex items-center text-gray-700">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 rounded" value="Social Impact">
+                        <span class="ml-2">Social Impact</span>
+                    </label>
+                    <label class="inline-flex items-center text-gray-700">
+                        <input type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 rounded" value="Entertainment">
+                        <span class="ml-2">Entertainment</span>
+                    </label>
+                </div>
+            </div>
+
+            <button id="craftStoryBtn" class="px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full bg-blue-600 hover:bg-blue-700">
+                <span id="craftStoryBtnText">Craft AI-Powered Story</span>
+                <span id="craftStorySpinner" class="hidden">
+                    <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+            </button>
+
+            <div id="generatedStoryContainer" class="mt-6 hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Your AI-Generated Story (Edit Below):</h3>
+                <textarea
+                    id="generatedStory"
+                    class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 resize-y min-h-[300px] bg-white text-gray-700 shadow-inner"
+                ></textarea>
+                <div class="mt-3">
+                    <label for="story-refine-instruction" class="block text-sm font-medium text-gray-700 mb-1">Refinement Instructions for AI (Optional):</label>
+                    <input
+                        type="text"
+                        id="story-refine-instruction"
+                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 transition duration-200"
+                        placeholder="e.g., Make it more dramatic, change the ending slightly"
+                    >
+                </div>
+                <button id="refineStoryBtn" class="mt-4 px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full bg-blue-600 hover:bg-blue-700">
+                    <span id="refineStoryBtnText">Refine Story with AI</span>
+                    <span id="refineStorySpinner" class="hidden">
+                        <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                </button>
+                <button id="copyStoryBtn" class="mt-4 px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition duration-300 shadow-md transform hover:scale-105">
+                    Copy Story to Clipboard
+                </button>
+            </div>
+        </section>
+
+        <!-- Element 6: AI Powered Image Generation -->
+        <section id="imageGenSection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-purple-700 mb-4">6. AI Powered Image Generation</h2>
+            <p class="text-gray-700 mb-4">
+                Generate image prompts from your story, select or edit one, and then create a visual for your narrative.
+            </p>
+            <div class="mb-3">
+                <label for="image-prompt-refine-instruction" class="block text-sm font-medium text-gray-700 mb-1">Refinement Instructions for Image Prompts (Optional):</label>
+                <input
+                    type="text"
+                    id="image-prompt-refine-instruction"
+                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-400 transition duration-200"
+                    placeholder="e.g., Focus on character's face, depict a wider landscape"
+                >
+            </div>
+            <button
+                id="generateImagePromptsBtn"
+                class="px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full bg-pink-600 hover:bg-pink-700"
+            >
+                <span id="generateImagePromptsBtnText">Generate Image Prompts from Story</span>
+                <span id="generateImagePromptsSpinner" class="hidden">
+                    <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+            </button>
+
+            <div id="imagePromptsContainer" class="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50 hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Suggested Image Prompts:</h3>
+                <div id="imagePromptRadioGroup" class="space-y-3">
+                    <!-- Image prompts will be dynamically loaded here -->
+                </div>
+                <div class="mt-4">
+                    <label for="custom-image-prompt" class="block text-lg font-semibold text-gray-800 mb-2">Edit or Enter Custom Prompt:</label>
+                    <textarea
+                        id="custom-image-prompt"
+                        class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 resize-y min-h-[80px]"
+                        placeholder="Enter your custom image prompt here..."
+                    ></textarea>
+                </div>
+                <button
+                    id="generateImageBtn"
+                    class="mt-4 px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full bg-purple-600 hover:bg-purple-700"
+                >
+                    <span id="generateImageBtnText">Generate Image</span>
+                    <span id="generateImageSpinner" class="hidden">
+                        <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                </button>
+            </div>
+
+            <div id="generatedImageContainer" class="mt-6 p-4 bg-gray-100 rounded-lg border border-purple-300 flex flex-col items-center hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-3">Your AI-Generated Image:</h3>
+                <img id="generatedImageDisplay" src="" alt="AI Generated Story Visual" class="max-w-full h-auto rounded-lg shadow-md border border-gray-200" />
+            </div>
+        </section>
+
+        <!-- Element 7: Social Media Post Generator -->
+        <section id="socialMediaPostSection" class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-3xl font-bold text-gray-700 mb-4">7. Social Media Post Generator</h2>
+            <p class="text-gray-700 mb-4">
+                Generate your complete social media post including text and image.
+                **You can edit the text directly.**
+            </p>
+
+            <div class="mb-6">
+                <button
+                    id="generateSocialMediaPostBtn"
+                    class="px-8 py-3 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full bg-indigo-600 hover:bg-indigo-700"
+                >
+                    <span id="generateSocialMediaPostBtnText">Generate Social Media Post</span>
+                    <span id="generateSocialMediaPostSpinner" class="hidden">
+                        <svg class="animate-spin-custom -ml-1 mr-3 h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                </button>
+            </div>
+
+            <div id="generatedSocialMediaPostContainer" class="mt-6 hidden">
+                <h3 class="text-xl font-bold text-gray-800 mb-2">Your Social Media Post:</h3>
+                <textarea
+                    id="generatedSocialMediaPost"
+                    class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition duration-200 resize-y min-h-[200px]"
+                ></textarea>
+                <canvas id="socialPostCanvas" class="border border-gray-300 rounded-lg shadow-md mx-auto block max-w-full h-auto"></canvas>
+                <button
+                    id="downloadCombinedPostBtn"
+                    class="mt-4 px-6 py-2 bg-blue-500 text-white font-bold rounded-lg hover:bg-blue-600 transition duration-300 shadow-md transform hover:scale-105 w-full"
+                >
+                    Download Complete Post as Image
+                </button>
+            </div>
+        </section>
+
+        <!-- "Start a New Story" Button at the very end -->
+        <section class="bg-white rounded-xl shadow-lg p-6 text-center">
+            <button
+                id="startNewStoryBtn"
+                class="px-8 py-3 bg-red-600 text-white font-bold rounded-lg hover:bg-red-700 transition duration-300 shadow-md transform hover:scale-105"
+            >
+                Start a New Story
+            </button>
+        </section>
+
+        <!-- Ethical Considerations & Tips Section (collapsible) -->
+        <section class="bg-white rounded-xl shadow-lg p-6 mt-8">
+            <h2 id="ethicalGuideToggle" class="text-3xl font-bold text-teal-600 mb-4 cursor-pointer">
+                Ethical AI in Storytelling
+                <span id="ethicalGuideToggleIcon" class="ml-2 text-blue-500 text-lg">▼</span>
+            </h2>
+            <div id="ethicalGuideContent" class="collapsible-content">
+                <p class="text-gray-700 mb-4 leading-relaxed">
+                    While AI is a powerful tool for creativity, it's crucial to use it responsibly and ethically.
+                    Consider the following:
+                </p>
+                <ul class="list-disc list-inside text-gray-700 mb-4 space-y-2 pl-4">
+                    <li>
+                        <strong>Originality & Attribution:</strong> AI-generated content can be a starting point,
+                        but true originality comes from your unique voice and revisions. If using AI content significantly,
+                        consider acknowledging its role.
+                    </li>
+                    <li>
+                        <strong>Bias & Stereotypes:</strong> AI models are trained on vast datasets and can sometimes
+                        perpetuate biases present in that data. Be mindful of the output and actively work to
+                        challenge and combat any stereotypical or harmful content.
+                    </li>
+                    <li>
+                        <strong>Ownership & Copyright:</strong> The legal landscape around AI-generated content
+                        ownership is still evolving. Understand that using AI doesn't automatically grant you
+                        full copyright in the same way as purely human-created work.
+                    </li>
+                    <li>
+                        <strong>Responsible Use:</strong> Avoid using AI to generate content that promotes hate speech,
+                        violence, discrimination, or misinformation. Use it to build positive and inclusive narratives.
+                    </li>
+                </ul>
+            </div>
+
+            <h2 id="tipsGuideToggle" class="text-3xl font-bold text-orange-600 mb-4 mt-6 cursor-pointer">
+                Tips for Effective Storytelling with AI
+                <span id="tipsGuideToggleIcon" class="ml-2 text-blue-500 text-lg">▼</span>
+            </h2>
+            <div id="tipsGuideContent" class="collapsible-content">
+                <ul class="list-disc list-inside text-gray-700 space-y-2 pl-4">
+                    <li>
+                        <strong>Iterate and Refine:</strong> Don't expect perfect output on the first try. Use AI to
+                        brainstorm ideas, then refine and expand upon them.
+                    </li>
+                    <li>
+                        <strong>Be Specific:</strong> The more detail you provide in your prompt, the more relevant
+                        and coherent the AI's response will be.
+                    </li>
+                    <li>
+                        <strong>Experiment with Tone & Style:</strong> Ask the AI to write in a specific genre,
+                        tone (e.g., humorous, suspenseful), or even the style of a famous author.
+                    </li>
+                    <li>
+                        <strong>Use AI for Brainstorming:</strong> Stuck on a plot point or character name?
+                        Let AI generate a list of possibilities.
+                    </li>
+                    <li>
+                        <strong>Combine AI with Human Creativity:</strong> The best results often come from using AI
+                        as a collaborative partner, not a replacement for your own imagination.
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-5xl text-center text-gray-600 text-sm mt-8 p-4">
+        <p>&copy; 2025 AI Storytelling Lab. Built for educational purposes.</p>
+    </footer>
+
+    <script>
+        // --- EDIT: API Keys removed from client-side code for security ---
+        // --- EDIT: API URLs now point to our secure Netlify serverless function ---
+        const GEMINI_API_URL = '/api/gemini';
+        const IMAGEN_API_URL = '/api/imagen';
+        
+        // --- Global State Management ---
+        // This simulates React's useState for a more organized approach in vanilla JS
+        let globalState = {
+            message: '',
+            isLoading: false,
+            isGeneratingImage: false,
+            showGuide: false,
+            showEthicalGuide: false,
+            showTipsGuide: false,
+
+            organizationType: '',
+            customOrganizationType: '',
+            scenarioContext: '',
+
+            characters: [],
+            newCharacterArchetype: '',
+            newCharacterName: '',
+            newCharacterDesc: '',
+            characterRefinementInstruction: {},
+
+            settingInputs: { timePeriod: '', geographicalLocation: '', atmosphereMood: '' },
+            settingAIResponse: '',
+            settingRefinementInstruction: '',
+
+            selectedArc: '',
+            arcInputs: {},
+            arcAIResponse: {},
+            arcRefinementInstruction: {},
+
+            generatedStory: '',
+            storyPlatform: '',
+            campaignObjectives: [],
+            storyTone: '',
+            storyLength: '',
+            storyRefinementInstruction: '',
+
+            imagePrompts: [],
+            selectedImagePrompt: '',
+            generatedImage: '',
+            imagePromptRefinementInstruction: '',
+
+            generatedSocialMediaPost: '',
+        };
+
+        const elements = {}; // To store references to DOM elements
+
+        // Helper to update state and trigger a re-render of the relevant UI parts
+        function updateState(newState, renderCallback = null) {
+            globalState = { ...globalState, ...newState };
+            if (renderCallback) {
+                renderCallback();
+            } else {
+                renderUI(); // Default re-render for general state changes
+            }
+        }
+
+        // --- UI Feedback Functions ---
+        function showMessage(text) {
+            elements.messageText.textContent = text;
+            elements.messageModal.classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            elements.messageModal.classList.add('hidden');
+            elements.messageText.textContent = '';
+        }
+
+        function toggleLoading(btnId, spinnerId, textId, loading) {
+            const btn = document.getElementById(btnId);
+            const spinner = document.getElementById(spinnerId);
+            const textSpan = document.getElementById(textId);
+            if (btn) btn.disabled = loading;
+            if (spinner) spinner.classList.toggle('hidden', !loading);
+            if (textSpan) textSpan.classList.toggle('hidden', loading);
+
+            // Disable/enable all primary action buttons while loading
+            const allButtons = document.querySelectorAll('button');
+            allButtons.forEach(button => {
+                if (!button.id.includes('Spinner') && button.id !== 'messageCloseButton' && !button.id.includes('Toggle')) {
+                    button.disabled = loading;
+                    button.classList.toggle('cursor-not-allowed', loading);
+                    button.classList.toggle('opacity-50', loading); // Visual feedback
+                }
+            });
+            // Re-enable specific buttons that manage their own loading (e.g., generateScenarioBtn when not its turn)
+            // This needs to be smarter. The current approach will re-enable ALL.
+            // A more robust solution would track loading states per component, but for surgical fix, this is an improvement.
+        }
+
+        // Generic API Call function
+        async function callGeminiAPI(promptText, btnId = null, spinnerId = null, textId = null) {
+            if (!promptText.trim()) {
+                showMessage('Prompt text is empty.');
+                return '';
+            }
+
+            // Set global loading state
+            updateState({ isLoading: true }, () => toggleLoading(btnId, spinnerId, textId, true));
+
+            try {
+                const chatHistory = [{ role: "user", parts: [{ text: promptText }] }];
+                const payload = { contents: chatHistory };
+
+                // --- EDIT: Fetch now calls our own secure endpoint ---
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    return result.candidates[0].content.parts[0].text;
+                } else {
+                    showMessage('No content generated by AI. Please try a different prompt or check console for details.');
+                    console.error('Unexpected Gemini API response structure:', result);
+                    return '';
+                }
+            } catch (error) {
+                showMessage(`Failed to generate content: ${error.message}. Please try again.`);
+                console.error('Error in callGeminiAPI:', error);
+                return '';
+            } finally {
+                // Clear global loading state
+                updateState({ isLoading: false }, () => toggleLoading(btnId, spinnerId, textId, false));
+            }
+        }
+
+        // --- Data Definitions (moved to global scope for accessibility) ---
+        const organizationTypes = [
+            { id: 'nonprofit', name: 'Nonprofits', description: 'Organizations focused on social causes and community benefit.' },
+            { id: 'for-profit-brands', name: 'For-Profit Brands', description: 'Businesses selling products or services.' },
+            { id: 'government-agencies', name: 'Government Agencies', description: 'Public sector bodies responsible for governance and services.' },
+            { id: 'educational-institutions', name: 'Educational Institutions', description: 'Schools, universities, and other learning centers.' },
+            { id: 'media-entertainment', name: 'Media & Entertainment', description: 'Companies in film, music, gaming, news, etc.' },
+            { id: 'health-wellness', name: 'Health & Wellness Organizations', description: 'Hospitals, clinics, wellness centers, and public health bodies.' },
+            { id: 'startups-tech', name: 'Startups / Tech Innovators', description: 'New companies focused on innovative technology or business models.' },
+            { id: 'civic-grassroots', name: 'Civic / Grassroots Movements', description: 'Community-led initiatives and advocacy groups.' },
+            { id: 'faith-based', name: 'Faith-Based / Religious Organizations', description: 'Organizations centered around religious beliefs and community.' },
+            { id: 'hybrid-social', name: 'Hybrid Social Enterprises', description: 'Businesses that blend commercial goals with social mission.' },
+            { id: 'other', name: 'Other (specify below)', description: 'Any other type of organization not listed.' },
+        ];
+
+        const characterArchetypes = [
+            { id: 'hero', name: 'The Hero', description: 'Usually the main character who goes on a journey and faces challenges.' },
+            { id: 'mentor', name: 'The Mentor', description: 'A wise guide who helps the hero with knowledge and support.' },
+            { id: 'antagonist', name: 'The Antagonist / Shadow', description: 'The force that opposes the hero.' },
+            { id: 'ally', name: 'The Ally', description: 'A character who supports the hero.' },
+            { id: 'herald', name: 'The Herald', description: 'The character or event that initiates the hero\'s adventure.' },
+            { id: 'threshold-guardian', name: 'The Threshold Guardian', description: 'An obstacle that tests the hero\'s resolve.' },
+            { id: 'shapeshifter', name: 'The Shapeshifter', description: 'A character with changing appearance or alliances.' },
+            { id: 'trickster', name: 'The Trickster', description: 'A mischievous character who can cause trouble or provide comic relief.' },
+            { id: 'custom', name: 'Create a new custom character', description: 'Define a completely new and imaginative character.' },
+        ];
+
+        const arcStructures = {
+            'three-act': {
+                name: 'Three-Act Structure',
+                parts: ['Setup (Beginning)', 'Confrontation (Middle)', 'Resolution (End)'],
+                description: 'A basic framework for most narrative forms, dividing a story into three main sections.'
+            },
+            'freytag-pyramid': {
+                name: "Freytag's Pyramid",
+                parts: ['Exposition', 'Rising Action', 'Climax', 'Falling Action', 'Denouement'],
+                description: 'A five-part dramatic structure charting the rise and fall of dramatic intensity.'
+            },
+            'storybrand': {
+                name: 'StoryBrand Framework',
+                parts: [
+                    'Character (Customer)', 'Problem', 'Meets a Guide (Brand)',
+                    'Gives them a Plan', 'Calls them to Action', 'Helps them avoid Failure',
+                    'And ends in Success'
+                ],
+                description: 'A marketing framework using a seven-part narrative to clarify a brand message.'
+            },
+        };
+
+        const platforms = ['Instagram', 'Twitter/X', 'Facebook', 'LinkedIn', 'Blog post', 'email', 'Social media advertisement'];
+        const objectives = ['Brand Awareness', 'Lead Generation', 'Product Launch', 'Social Impact', 'Entertainment'];
+        const tones = ['Humorous', 'Dramatic', 'Thriller', 'Inspirational', 'Informative', 'Academic', 'Conversational', 'Mysterious'];
+        const lengths = [
+            { value: 'short', label: 'Short (approx. 75-150 words)' },
+            { value: 'medium', label: 'Medium (approx. 150-250 words)' },
+            { value: 'long', label: 'Long (approx. 250-350 words)' },
+        ];
+
+
+        // --- Element 1 Logic (Organizational Context) ---
+        const generateScenario = async () => {
+            const currentOrgTypeDisplayName = organizationTypes.find(type => type.id === globalState.organizationType)?.name || globalState.organizationType;
+            const actualOrgTypeForPrompt = globalState.organizationType === 'other' ? globalState.customOrganizationType : currentOrgTypeDisplayName;
+
+            if (!actualOrgTypeForPrompt.trim()) {
+                showMessage('Please select an Organization Type or provide a custom type to generate a scenario.');
+                return;
+            }
+
+            let prompt = `Using the following 8-Step Blueprint for scenario generation, invent a plausible, specific name for a "${actualOrgTypeForPrompt}" and then generate a realistic, relatable, and educationally valuable storytelling scenario for this organization. The entire output for this scenario (including all 8 steps) should be concise, aiming for approximately 150 words.
+            
+            **AI Scenario Generation Blueprint:**
+            1. **Organizational Identity:**
+               - Purpose: Ground the scenario in a plausible, context-rich organization.
+               - Instruction: Generate a realistic name + brief description of the agency/org, including mission, domain (e.g., environmental preservation, consumer goods, youth services), and organizational tone (bureaucratic, activist, corporate, etc.).
+            2. **Realistic Setting:**
+               - Purpose: Anchor the story in a specific place or context.
+               - Instruction: Describe a named location (fictional but plausible: e.g., “Willow Creek,” “Clearview County”) with relevant environmental, social, or economic traits. Add season or timing if relevant.
+            3. **Trigger Event or Problem:**
+               - Purpose: Introduce the conflict or communication challenge.
+               - Instruction: Present a realistic tension or crisis: e.g., public backlash, emerging scandal, sudden policy shift, or reputation risk. The issue should be rooted in the organization's mission.
+            4. **Stakeholder Map:**
+               - Purpose: Establish communication complexity.
+               - Instruction: List at least 3–5 key stakeholder groups with differing concerns or attitudes. Include citizens, officials, activists, media, etc.
+            5. **Narrative Stakes:**
+               - Purpose: Create emotional and practical consequences.
+               - Instruction: Clearly define what is at risk if communication fails: public trust, health, environment, funding, lives, or long-term legitimacy. Also show what could be gained.
+            6. **Strategic Constraints:**
+               - Purpose: Add real-world tension.
+               - Instruction: Specify what limits the org’s ability to act (budget, politics, timelines, inter-agency friction, legal constraints). Add urgency (e.g., “next season,” “funding vote next month”).
+            7. **Ethical/Emotional Layer:**
+               - Purpose: Deepen storytelling potential.
+               - Instruction: Introduce ethical tradeoffs (e.g., transparency vs. fear, equity vs. effectiveness) and internal debates (e.g., scientific vs. PR framing). Give space for students to explore nuance.
+            8. **Student Prompt – Guide the Storytelling Output:**
+               - Purpose: Direct student output clearly.
+               - Instruction: Ask students to write a story from the perspective of the organization’s communication team as they navigate the scenario. The story should be crafted for a public audience and suitable for digital or social media platforms.
+                 Their submission should include:
+                 - Key Character(s): Who is the communicator or spokesperson? What motivates them? What challenges do they face?
+                 - Setting: Where and when does the story unfold? Ground the audience in the physical, social, or emotional context.
+                 - Story Arc: Include a clear beginning (setup of the problem), middle (rising tension and communication efforts), and end (resolution or continued challenge).
+                 - Multimedia Readiness: Draft the story in a format that could be adapted for social media (e.g., Instagram carousel, LinkedIn post, video script, or blog-style narrative). Consider how textual storytelling and visual elements (like photos, infographics, captions) can work together to engage the audience.
+                 - Encourage students to focus on audience empathy, authentic voice, and strategic message framing that aligns with the organization’s values and the urgency of the situation.
+
+            Format the output clearly with bolded component names for each step.`;
+
+            if (globalState.organizationType === 'nonprofit') {
+                prompt += ` For a Nonprofit, emphasize scenarios involving community engagement, fundraising campaigns, or advocacy.`;
+            } else if (globalState.organizationType === 'for-profit-brands') {
+                prompt += ` For a Brand, emphasize scenarios involving product launches, brand reputation management, or consumer engagement campaigns.`;
+            } else if (globalState.organizationType === 'government-agencies') {
+                prompt += ` For a Government Agency, focus on public information, policy promotion, or managing public perception during a challenge.`;
+            } else if (globalState.organizationType === 'educational-institutions') {
+                prompt += ` For an Educational Institution, focus on student recruitment, public funding campaigns, or managing a campus-wide issue.`;
+            } else if (globalState.organizationType === 'media-entertainment') {
+                prompt += ` For Media & Entertainment, consider scenarios around content launch, audience engagement, or responding to industry changes.`;
+            } else if (globalState.organizationType === 'health-wellness') {
+                prompt += ` For Health & Wellness, focus on public health campaigns, patient advocacy, or managing health crises.`;
+            } else if (globalState.organizationType === 'startups-tech') {
+                prompt += ` For a Startup/Tech Innovator, consider scenarios around product adoption, investor relations, or navigating market disruption.`;
+            } else if (globalState.organizationType === 'civic-grassroots') {
+                prompt += ` For Civic/Grassroots Movements, focus on advocacy campaigns, community organizing, or achieving social change.`;
+            } else if (globalState.organizationType === 'faith-based') {
+                prompt += ` For a Faith-Based organization, focus on community outreach, interfaith dialogue, or addressing social issues from a faith perspective.`;
+            } else if (globalState.organizationType === 'hybrid-social') {
+                prompt += ` For a Hybrid Social Enterprise, focus on balancing social impact with business viability, or communicating their dual mission effectively.`;
+            }
+            
+            const response = await callGeminiAPI(prompt, 'generateScenarioBtn', 'generateScenarioSpinner', 'generateScenarioBtnText');
+            updateState({ scenarioContext: response });
+        };
+
+
+        // --- Element 2 Logic (Character Development) ---
+        const addCharacter = () => {
+            const archetype = elements.newCharacterArchetype.value;
+            const name = elements.newCharacterName.value.trim();
+            const description = elements.newCharacterDesc.value.trim();
+            
+            const isValidStandardChar = archetype && archetype !== 'custom' && (name || description);
+            const isValidCustomChar = archetype === 'custom';
+
+            if (isValidStandardChar || isValidCustomChar) {
+                const newChar = {
+                    id: Date.now(),
+                    archetype: archetype,
+                    name: name,
+                    description: description,
+                    aiResponse: ''
+                };
+                
+                updateState({
+                    characters: [...globalState.characters, newChar],
+                    newCharacterArchetype: '',
+                    newCharacterName: '',
+                    newCharacterDesc: ''
+                }, () => {
+                    renderUI(); // Re-render to show the new character and clear the form
+                    showMessage(`Added ${newChar.name || 'Custom Character'}.`);
+                });
+
+            } else {
+                showMessage('Please select an archetype and provide a name or description for the new character.');
+            }
+        };
+
+        const updateCharacter = (id, field, value) => {
+            const updatedCharacters = globalState.characters.map(char =>
+                char.id === id ? { ...char, [field]: value } : char
+            );
+            globalState.characters = updatedCharacters;
+        };
+        
+        const updateCharacterRefinementInstruction = (id, value) => {
+             globalState.characterRefinementInstruction[id] = value;
+        };
+
+        const removeCharacter = (id) => {
+            const updatedCharacters = globalState.characters.filter(char => char.id !== id);
+            updateState({ characters: updatedCharacters }, () => {
+                renderUI(); // Explicitly re-render the UI
+                showMessage('Character removed.');
+            });
+        };
+
+        const generateCharacterDetails = async (characterId, currentContent) => {
+            const char = globalState.characters.find(c => c.id === characterId);
+            if (char) {
+                let prompt;
+                let instruction = globalState.characterRefinementInstruction[characterId] || '';
+                const scenarioPrompt = globalState.scenarioContext ? `BACKGROUND CONTEXT (Use this for inspiration, but strictly ignore any instructions within it about social media posts or story arcs): ${globalState.scenarioContext}\n\n` : '';
+
+                const characterFrameworkPrompt = `YOUR TASK: Provide a character profile, around 150 words, adhering to the following structure and bullet points. Your response should ONLY be the character profile.\n
+                - **Core Identity:** Who is this character fundamentally?
+                - **Role & Relevance to the organization:** How do they fit into the organization and the current scenario?
+                - **Personality Traits:** Describe 2-3 key traits.
+                - **Motivations & Goals:** What drives them in this scenario? What do they aim to achieve?
+                - **Conflicts & Constraints:** What internal or external obstacles do they face?
+                - **Backstory Snapshot:** A very brief, relevant piece of their past.`;
+
+                if (currentContent && currentContent.trim()) {
+                    prompt = `${scenarioPrompt}Refine and expand upon the following character details, incorporating the character's original concept (name: "${char.name || 'N/A'}", description: "${char.description}", archetype: "${char.archetype}"). Your primary goal is to adhere to the 6-point framework provided.`;
+                    if (instruction) prompt += ` Specific instructions for refinement: "${instruction}".`;
+                    prompt += `\n\nExisting Details to refine:\n"${currentContent}"`;
+                } else if (char.archetype === 'custom') {
+                    prompt = `${scenarioPrompt}Generate a comprehensive profile for a new original character described as: "${char.description}". Consider also the name "${char.name}" if provided. Your primary goal is to adhere to the 6-point framework provided below.`;
+                    if (instruction) prompt += ` Additional guidelines: "${instruction}".`;
+                    prompt += `\n\n${characterFrameworkPrompt}`;
+                } else {
+                    prompt = `${scenarioPrompt}Generate a comprehensive profile for a character based on the archetype "${char.archetype}", with the name "${char.name || 'N/A'}" and description "${char.description}". Your primary goal is to adhere to the 6-point framework provided below.`;
+                    if (instruction) prompt += ` Additional guidelines: "${instruction}".`;
+                    prompt += `\n\n${characterFrameworkPrompt}`;
+                }
+                const response = await callGeminiAPI(prompt, `generateCharacterDetailsBtn-${char.id}`, `generateCharacterDetailsSpinner-${char.id}`, `generateCharacterDetailsBtnText-${char.id}`);
+                updateState({
+                    characters: globalState.characters.map(c => c.id === char.id ? { ...c, aiResponse: response } : c),
+                    characterRefinementInstruction: { ...globalState.characterRefinementInstruction, [char.id]: '' }
+                });
+            }
+        };
+
+        // --- Element 3 Logic (Setting) ---
+        const generateSettingDetails = async (currentContent) => {
+            const { timePeriod, geographicalLocation, atmosphereMood } = globalState.settingInputs;
+            let prompt;
+            let instruction = globalState.settingRefinementInstruction || '';
+            const scenarioPrompt = globalState.scenarioContext ? `Context: ${globalState.scenarioContext}\n\n` : '';
+
+            if (currentContent && currentContent.trim()) {
+                prompt = `${scenarioPrompt}Refine and expand upon the following story setting details. Ensure the response is a descriptive paragraph about the setting ONLY. Strictly limit the description to approximately 150 words. Do NOT include any social media post content, hashtags, or calls to action.`;
+                if (instruction) prompt += ` Specific instructions for refinement: "${instruction}".`;
+                prompt += `\n\nExisting Details:\n"${currentContent}"`;
+            } else if (!timePeriod && !geographicalLocation && !atmosphereMood) {
+                showMessage('Please provide some initial input for the setting or current content to generate details.');
+                return;
+            } else {
+                prompt = `${scenarioPrompt}Elaborate on a story setting with the following details: Time Period: "${timePeriod}", Geographical Location: "${geographicalLocation}", Atmosphere/Mood: "${atmosphereMood}". Describe the environment, culture, and any unique elements in a single descriptive paragraph. Strictly limit the description to approximately 150 words. Do NOT include any social media post content, hashtags, or calls to action.`;
+                if (instruction) prompt += ` Additional guidelines: "${instruction}".`;
+            }
+            const response = await callGeminiAPI(prompt, 'generateSettingDetailsBtn', 'generateSettingSpinner', 'generateSettingDetailsBtnText');
+            updateState({ settingAIResponse: response, settingRefinementInstruction: '' });
+        };
+
+
+        // --- Element 4 Logic (Storytelling Arcs) ---
+        const generateArcPartContent = async (part, currentContent) => {
+            const userInput = globalState.arcInputs[part] || '';
+            let fullPrompt;
+            let instruction = globalState.arcRefinementInstruction[part] || '';
+            const scenarioPrompt = globalState.scenarioContext ? `Context: ${globalState.scenarioContext}\n\n` : '';
+            
+            let characterContext = '';
+            if (globalState.characters.length > 0) {
+                characterContext += `\n\nKEY CHARACTERS:\n`;
+                globalState.characters.forEach(char => {
+                    characterContext += `- Name: ${char.name || 'N/A'}, Archetype: ${characterArchetypes.find(a => a.id === char.archetype)?.name}\n  Details: ${char.aiResponse || char.description}\n`;
+                });
+                 characterContext += `\n`;
+            }
+            
+            let settingContext = '';
+            if (globalState.settingAIResponse.trim()) {
+                settingContext += `STORY SETTING:\n${globalState.settingAIResponse}\n\n`;
+            }
+
+            let previousArcContent = '';
+            if (globalState.selectedArc) {
+                const currentArcStructure = arcStructures[globalState.selectedArc];
+                const partsBeforeCurrent = currentArcStructure.parts.slice(0, currentArcStructure.parts.indexOf(part));
+                partsBeforeCurrent.forEach(p => {
+                    if (globalState.arcInputs[p]) previousArcContent += `Previous Part "${p}" (User Input): ${globalState.arcInputs[p]}\n`;
+                    if (globalState.arcAIResponse[p]) previousArcContent += `Previous Part "${p}" (AI Output): ${globalState.arcAIResponse[p]}\n`;
+                });
+            }
+            if (previousArcContent) previousArcContent = `Context from previous story arc parts:\n${previousArcContent}\n`;
+
+            const btnId = `generateArcPartContentBtn-${arcStructures[globalState.selectedArc].parts.indexOf(part)}`;
+            const spinnerId = `generateArcPartSpinner-${arcStructures[globalState.selectedArc].parts.indexOf(part)}`;
+            const textId = `generateArcPartContentBtnText-${arcStructures[globalState.selectedArc].parts.indexOf(part)}`;
+
+            if (currentContent && currentContent.trim()) {
+                fullPrompt = `${scenarioPrompt}${characterContext}${settingContext}${previousArcContent}Based on all the context provided above, refine and expand upon the following "${part}" part of a story. Limit the description to approximately 150 words.`;
+                if (instruction) fullPrompt += ` Specific instructions for refinement: "${instruction}".`;
+                fullPrompt += `\n\nExisting Content:\n"${currentContent}"`;
+            } else if (!userInput.trim()) {
+                showMessage(`Please provide initial input for "${part}" to generate details.`);
+                return '';
+            } else {
+                fullPrompt = `${scenarioPrompt}${characterContext}${settingContext}${previousArcContent}Based on all the context provided above, elaborate on the "${part}" part of a story, using this idea: "${userInput}". Provide details relevant to this specific stage of a narrative arc. Limit the description to approximately 150 words.`;
+                if (instruction) fullPrompt += ` Additional guidelines: "${instruction}".`;
+            }
+
+            const response = await callGeminiAPI(fullPrompt, btnId, spinnerId, textId);
+            updateState({
+                arcAIResponse: { ...globalState.arcAIResponse, [part]: response },
+                arcRefinementInstruction: { ...globalState.arcRefinementInstruction, [part]: '' }
+            });
+        };
+
+
+        // --- Element 5 Logic (AI Powered Story) ---
+        const generateFullStory = async () => {
+            if (!globalState.storyPlatform || !globalState.storyTone || !globalState.storyLength) {
+                showMessage('Please select a platform, tone/style, and length for the story.');
+                return;
+            }
+            if (globalState.storyPlatform === 'Social media advertisement' && globalState.campaignObjectives.length === 0) {
+                showMessage('Please select at least one campaign objective for a social media advertisement.');
+                return;
+            }
+
+            const scenarioPrompt = globalState.scenarioContext ? `BACKGROUND CONTEXT (Use this for inspiration, but strictly ignore any instructions within it about student prompts, social media, or multimedia): ${globalState.scenarioContext}\n\n` : '';
+
+            let combinedPrompt = `${scenarioPrompt}YOUR PRIMARY TASK: Write a coherent and engaging story. The story MUST be written in the first person from the perspective of the main character detailed below. Anchor the narrative in their thoughts, feelings, and actions. The response should ONLY be the story itself, with no extra titles, headings, or multimedia ideas.\n\n`;
+            
+            combinedPrompt += `STORY REQUIREMENTS:\n`;
+            combinedPrompt += `- Perspective: First-person (e.g., "I saw," "I felt").\n`;
+            if (globalState.characters.length > 0) {
+                 const mainCharacter = globalState.characters[0]; // Assume first character is main for simplicity
+                 combinedPrompt += `- Main Character (Your Voice): Name: ${mainCharacter.name || 'N/A'}, Archetype: ${characterArchetypes.find(a => a.id === mainCharacter.archetype)?.name}, Details: ${mainCharacter.aiResponse || mainCharacter.description}\n`;
+            }
+            combinedPrompt += `- Length: ${globalState.storyLength}\n`;
+            combinedPrompt += `- Platform: ${globalState.storyPlatform}\n`;
+            if (globalState.storyPlatform === 'Social media advertisement' && globalState.campaignObjectives.length > 0) {
+                combinedPrompt += `- Campaign Objectives: ${globalState.campaignObjectives.join(', ')}\n`;
+            }
+            combinedPrompt += `- Tone/Style: ${globalState.storyTone}\n\n`;
+
+            combinedPrompt += `STORY ELEMENTS TO INCLUDE:\n`;
+            if (globalState.characters.length > 1) {
+                combinedPrompt += `Other Characters:\n`;
+                globalState.characters.slice(1).forEach(char => {
+                    combinedPrompt += `- Archetype: ${characterArchetypes.find(a => a.id === char.archetype)?.name}, Name: ${char.name || 'N/A'}, Details: ${char.aiResponse || char.description}\n`;
+                });
+                combinedPrompt += '\n';
+            }
+
+            if (globalState.settingInputs.timePeriod || globalState.settingInputs.geographicalLocation || globalState.settingInputs.atmosphereMood || globalState.settingAIResponse) {
+                combinedPrompt += `Setting: Time Period: ${globalState.settingInputs.timePeriod}, Location: ${globalState.settingInputs.geographicalLocation}, Mood: ${globalState.settingInputs.atmosphereMood}\n`;
+                if (globalState.settingAIResponse) combinedPrompt += `AI-Generated Setting Details: ${globalState.settingAIResponse}\n\n`;
+            }
+
+            if (globalState.selectedArc) {
+                combinedPrompt += `Story Arc (${arcStructures[globalState.selectedArc].name}):\n`;
+                arcStructures[globalState.selectedArc].parts.forEach(part => {
+                    if (globalState.arcInputs[part] || globalState.arcAIResponse[part]) {
+                        combinedPrompt += `- ${part}: ${globalState.arcInputs[part] || ''} ${globalState.arcAIResponse[part] || ''}\n`;
+                    }
+                });
+                combinedPrompt += '\n';
+            }
+
+            let instruction = globalState.storyRefinementInstruction || '';
+            if (globalState.generatedStory.trim()) {
+                 combinedPrompt += `You are now refining the story. Refine or continue the following story, ensuring it follows all the rules above (first-person, no multimedia ideas, etc.).`;
+                 if (instruction) combinedPrompt += ` Specific instructions for this refinement: "${instruction}".`;
+                 combinedPrompt += `\n\nExisting Story to Refine:\n"${globalState.generatedStory}"`;
+            }
+
+            const response = await callGeminiAPI(combinedPrompt, 'craftStoryBtn', 'craftStorySpinner', 'craftStoryBtnText');
+            updateState({ generatedStory: response, storyRefinementInstruction: '' });
+        };
+
+        // --- Element 6 Logic (AI Powered Image Generation) ---
+        const generateImagePrompts = async () => {
+            if (!globalState.generatedStory.trim()) {
+                showMessage('Please generate a story first to get image prompts.');
+                return;
+            }
+            const storyToPromptFrom = globalState.generatedStory.trim();
+            let prompt = `Based on the following story, generate 3-5 distinct and creative image prompts suitable for an AI image generator. Each prompt should vividly describe a key scene, character, or moment. Present them as a numbered list.`;
+            let instruction = globalState.imagePromptRefinementInstruction || '';
+            if (instruction) prompt += ` Specific instructions for refinement: "${instruction}".`;
+            prompt += `\n\nStory:\n"${storyToPromptFrom.substring(0, 2000)}..."`;
+
+            const response = await callGeminiAPI(prompt, 'generateImagePromptsBtn', 'generateImagePromptsSpinner', 'generateImagePromptsBtnText');
+            const parsedPrompts = response.split('\n').filter(line => line.match(/^\d+\./)).map(line => line.replace(/^\d+\.\s*/, '').trim());
+            updateState({ imagePrompts: parsedPrompts, selectedImagePrompt: parsedPrompts[0] || '', imagePromptRefinementInstruction: '' });
+        };
+
+        const generateImage = async () => {
+            if (!globalState.selectedImagePrompt.trim()) {
+                showMessage('Please select or write an image prompt.');
+                return;
+            }
+
+            updateState({ isGeneratingImage: true }, () => toggleLoading('generateImageBtn', 'generateImageSpinner', 'generateImageBtnText', true));
+            showMessage('Generating image, please wait...');
+
+            try {
+                const payload = { instances: { prompt: globalState.selectedImagePrompt }, parameters: { "sampleCount": 1 } };
+
+                // --- EDIT: Fetch now calls our own secure endpoint ---
+                const response = await fetch(IMAGEN_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+                }
+
+                const result = await response.json();
+
+                if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                    const imageUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                    updateState({ generatedImage: imageUrl }, renderUI); 
+                    showMessage('Image generated successfully!');
+                } else {
+                    showMessage('No image generated. Please try a different prompt.');
+                    console.error('Unexpected Imagen API response structure:', result);
+                }
+            } catch (error) {
+                showMessage(`Failed to generate image: ${error.message}.`);
+                console.error('Error generating image:', error);
+            } finally {
+                updateState({ isGeneratingImage: false }, () => toggleLoading('generateImageBtn', 'generateImageSpinner', 'generateImageBtnText', false));
+            }
+        };
+
+        // --- Element 7 Logic (Social Media Post Generator) ---
+        const generateSocialMediaPost = async () => {
+            if (!globalState.generatedStory.trim() || !globalState.generatedImage.trim() || !globalState.storyPlatform) {
+                showMessage('Please ensure a story is generated, an image is generated, and a platform is selected to create a social media post.');
+                return;
+            }
+
+            const mainCharacter = globalState.characters.find(char => char.archetype === 'hero' || char.id === 'custom');
+            const characterInfo = mainCharacter ? `The main character is "${mainCharacter.name || 'N/A'}" (${mainCharacter.description}). Their core identity and motivations are: ${mainCharacter.aiResponse || 'N/A'}.` : '';
+            const audienceContext = globalState.scenarioContext.includes("target audience:") ? globalState.scenarioContext.split("target audience:")[1].split("\n")[0].trim() : "general public";
+
+
+            let prompt = `Generate a compelling and relatable social media post for "${globalState.storyPlatform}" from the perspective of or prominently featuring the main character. The post should emotionally connect with the target audience and convey key aspects of the story.`;
+            prompt += `\n\nStory: "${globalState.generatedStory}"\n\n`;
+            prompt += `Image concept: "${globalState.selectedImagePrompt || 'N/A'}"\n\n`;
+            prompt += `Tone/Style: ${globalState.storyTone}\n`;
+            prompt += `Main Character Details: ${characterInfo}\n`;
+            prompt += `Target Audience: ${audienceContext}\n`;
+            if (globalState.storyPlatform === 'Social media advertisement' && globalState.campaignObjectives.length > 0) {
+                prompt += `Campaign Objectives: ${globalState.campaignObjectives.join(', ')}\n`;
+            }
+            prompt += `\nInclude engaging copy appropriate for ${globalState.storyPlatform}, 3-5 relevant hashtags, and a clear call to action. Focus on authenticity, emotional resonance, and relatability for the target audience.`;
+
+            if (globalState.generatedSocialMediaPost.trim()) {
+                prompt = `Refine the following social media post copy for "${globalState.storyPlatform}", considering the original story, image concept, main character, target audience, and tone. Make improvements based on the existing content below. Focus on authenticity, emotional resonance, and relatability for the target audience.`;
+                prompt += `\n\nExisting Social Media Post Copy:\n"${globalState.generatedSocialMediaPost}"\n\nOriginal story elements and context:\n${globalState.generatedStory.substring(0, 500)}... (truncated for brevity)`;
+            }
+
+            const response = await callGeminiAPI(prompt, 'generateSocialMediaPostBtn', 'generateSocialMediaPostSpinner', 'generateSocialMediaPostBtnText');
+            updateState({ generatedSocialMediaPost: response }, () => {
+                renderUI();
+                drawCombinedPostPreview(response); 
+            });
+        };
+        
+        const drawCombinedPostPreview = (postText, onComplete = null) => {
+            if (!globalState.generatedImage || !postText) {
+                elements.socialPostCanvas.classList.add('hidden');
+                return; 
+            }
+            elements.socialPostCanvas.classList.remove('hidden');
+
+            const canvas = elements.socialPostCanvas;
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+
+            img.onload = () => {
+                const aspectRatio = img.width / img.height;
+                const canvasWidth = 600; 
+                let imageHeight = canvasWidth / aspectRatio;
+
+                const paddingX = 20;
+                const lineHeight = 22;
+                ctx.font = `${lineHeight}px Inter, sans-serif`; 
+                const lines = [];
+                let currentLine = '';
+                const words = postText.split(' ');
+                for (let i = 0; i < words.length; i++) {
+                    const testLine = currentLine + words[i] + ' ';
+                    const metrics = ctx.measureText(testLine);
+                    const testWidth = metrics.width;
+                    if (testWidth > (canvasWidth - 2 * paddingX) && i > 0) {
+                        lines.push(currentLine);
+                        currentLine = words[i] + ' ';
+                    } else {
+                        currentLine = testLine;
+                    }
+                }
+                lines.push(currentLine);
+
+                const totalTextHeight = lines.length * lineHeight;
+                const textSectionPadding = 40; 
+
+                canvas.width = canvasWidth;
+                canvas.height = imageHeight + totalTextHeight + textSectionPadding;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, imageHeight);
+
+                ctx.fillStyle = '#333333';
+                ctx.font = '18px Inter, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+
+                let y = imageHeight + (textSectionPadding / 2);
+
+                for (let i = 0; i < lines.length; i++) {
+                    ctx.fillText(lines[i], paddingX, y);
+                    y += lineHeight;
+                }
+                
+                if (onComplete) {
+                    onComplete(canvas);
+                }
+            };
+            img.onerror = () => {
+                console.error('Failed to load image for preview. Please ensure the image is valid.');
+            };
+            img.src = globalState.generatedImage;
+        };
+
+
+        const downloadCombinedPost = () => {
+            const currentText = elements.generatedSocialMediaPost.value;
+
+            if (!globalState.generatedImage || !currentText) {
+                showMessage("Nothing to download. Please generate a social media post first.");
+                return;
+            }
+
+            
+            const downloadAction = (canvas) => {
+                const dataURL = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataURL;
+                a.download = 'social_media_post.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                showMessage('Social media post downloaded as an image!');
+            };
+
+            
+            drawCombinedPostPreview(currentText, downloadAction);
+        };
+
+
+        // "Start a New Story" function
+        const startNewStory = () => {
+            // Reset all state variables to their initial empty values
+            updateState({
+                organizationType: '',
+                customOrganizationType: '',
+                scenarioContext: '',
+
+                characters: [],
+                newCharacterArchetype: '',
+                newCharacterName: '',
+                newCharacterDesc: '',
+                characterRefinementInstruction: {},
+
+                settingInputs: { timePeriod: '', geographicalLocation: '', atmosphereMood: '' },
+                settingAIResponse: '',
+                settingRefinementInstruction: '',
+
+                selectedArc: '',
+                arcInputs: {},
+                arcAIResponse: {},
+                arcRefinementInstruction: {},
+
+                generatedStory: '',
+                storyPlatform: '',
+                campaignObjectives: [],
+                storyTone: '',
+                storyLength: '',
+                storyRefinementInstruction: '',
+
+                imagePrompts: [],
+                selectedImagePrompt: '',
+                generatedImage: '',
+                imagePromptRefinementInstruction: '',
+
+                generatedSocialMediaPost: '',
+            }, () => {
+                renderUI(); 
+                showMessage('All inputs and outputs cleared. Start a new story!');
+                window.scrollTo(0, 0); // Scroll to top
+            });
+        };
+
+
+        // --- Core UI Rendering / Update Functions ---
+        // This simulates React's rendering, updating DOM based on globalState
+        function renderUI() {
+            // Guide Section
+            elements.guideContent.classList.toggle('expanded', globalState.showGuide);
+            elements.guideToggleIcon.textContent = globalState.showGuide ? '▲' : '▼';
+            elements.ethicalGuideContent.classList.toggle('expanded', globalState.showEthicalGuide);
+            elements.ethicalGuideToggleIcon.textContent = globalState.showEthicalGuide ? '▲' : '▼';
+            elements.tipsGuideContent.classList.toggle('expanded', globalState.showTipsGuide);
+            elements.tipsGuideToggleIcon.textContent = globalState.showTipsGuide ? '▲' : '▼';
+
+
+            // Element 1: Organizational Context
+            elements.orgTypeSelect.value = globalState.organizationType;
+            const selectedOrgType = globalState.organizationType ? organizationTypes.find(type => type.id === globalState.organizationType) : null;
+            if (selectedOrgType && selectedOrgType.id !== 'other') {
+                elements.orgTypeDescription.textContent = selectedOrgType.description;
+            } else {
+                elements.orgTypeDescription.textContent = '';
+            }
+            elements.customOrgTypeInputContainer.classList.toggle('hidden', globalState.organizationType !== 'other');
+            elements.customOrgTypeInput.value = globalState.customOrganizationType;
+            
+            elements.scenarioContextContainer.classList.toggle('hidden', !globalState.scenarioContext);
+            elements.scenarioContext.value = globalState.scenarioContext;
+            
+            elements.generateScenarioBtnText.textContent = globalState.scenarioContext ? 'Generate a New AI-Generated Scenario' : 'Generate Scenario with AI';
+            elements.generateScenarioBtn.disabled = globalState.isLoading || (!globalState.organizationType.trim() || (globalState.organizationType === 'other' && !globalState.customOrganizationType.trim()));
+            elements.generateScenarioSpinner.classList.toggle('hidden', !globalState.isLoading);
+            elements.generateScenarioBtn.querySelector('span:first-child').classList.toggle('hidden', globalState.isLoading);
+
+
+            // Element 2: Characters
+            // FIX: Ensure the form inputs are explicitly set from the (now cleared) global state
+            elements.newCharacterArchetype.value = globalState.newCharacterArchetype;
+            elements.newCharacterName.value = globalState.newCharacterName;
+            elements.newCharacterDesc.value = globalState.newCharacterDesc;
+            const selectedArchetype = characterArchetypes.find(a => a.id === globalState.newCharacterArchetype);
+            elements.newCharArchetypeDescription.textContent = selectedArchetype ? selectedArchetype.description : '';
+            renderCharacters();
+
+            // Element 3: Setting
+            elements.settingTime.value = globalState.settingInputs.timePeriod;
+            elements.settingLocation.value = globalState.settingInputs.geographicalLocation;
+            elements.settingMood.value = globalState.settingInputs.atmosphereMood;
+            elements.settingAIResponseContainer.classList.toggle('hidden', !globalState.settingAIResponse);
+            elements.settingAIResponse.value = globalState.settingAIResponse;
+            elements.settingRefineInstruction.value = globalState.settingRefinementInstruction;
+            elements.generateSettingDetailsBtnText.textContent = globalState.settingAIResponse ? 'Refine Setting Details with AI' : 'Generate Setting Details with AI';
+            elements.generateSettingDetailsBtn.disabled = globalState.isLoading || (!globalState.settingInputs.timePeriod.trim() && !globalState.settingInputs.geographicalLocation.trim() && !globalState.settingInputs.atmosphereMood.trim() && !globalState.settingAIResponse.trim());
+            elements.generateSettingSpinner.classList.toggle('hidden', !globalState.isLoading);
+            elements.generateSettingDetailsBtn.querySelector('span:first-child').classList.toggle('hidden', globalState.isLoading);
+
+
+            // Element 4: Arcs
+            elements.arcSelect.value = globalState.selectedArc;
+            const arcStructureDescriptionElement = document.getElementById('arcStructureDescription');
+            const arcPartsContainerElement = document.getElementById('arcPartsContainer');
+
+            const selectedArcStructure = globalState.selectedArc ? arcStructures[globalState.selectedArc] : null;
+            if (selectedArcStructure) {
+                arcStructureDescriptionElement.textContent = selectedArcStructure.description;
+                arcPartsContainerElement.innerHTML = ''; // Clear existing
+                selectedArcStructure.parts.forEach((part, index) => {
+                    const partDiv = document.createElement('div');
+                    partDiv.className = 'bg-gray-50 p-4 rounded-lg border border-gray-200';
+                    partDiv.innerHTML = `
+                        <label for="arc-part-${index}" class="block text-lg font-semibold text-gray-800 mb-2">${part}:</label>
+                        <textarea
+                            id="arc-part-${index}"
+                            class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 resize-y min-h-[80px]"
+                            placeholder="Describe the ${part.toLowerCase()} of your story..."
+                        >${globalState.arcInputs[part] || ''}</textarea>
+                        ${globalState.arcAIResponse[part] ? `
+                            <div class="mt-4 p-3 bg-white rounded-lg border border-blue-200 text-gray-700 shadow-inner">
+                                <h4 class="font-semibold text-blue-700 mb-2">AI Suggestion for ${part} (Edit Below):</h4>
+                                <textarea
+                                    id="arc-ai-response-${index}"
+                                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 resize-y min-h-[100px]"
+                                >${globalState.arcAIResponse[part]}</textarea>
+                                <div class="mt-3">
+                                    <label for="arc-refine-instruction-${index}" class="block text-sm font-medium text-gray-700 mb-1">Refinement Instructions for AI (Optional):</label>
+                                    <input
+                                        type="text"
+                                        id="arc-refine-instruction-${index}"
+                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 transition duration-200"
+                                        placeholder="e.g., Make this more concise, add a twist"
+                                        value="${globalState.arcRefinementInstruction[part] || ''}"
+                                    />
+                                </div>
+                            </div>
+                        ` : ''}
+                        <button
+                            id="generateArcPartContentBtn-${index}"
+                            data-part="${part}"
+                            class="mt-4 px-6 py-2 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full ${globalState.isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'}"
+                            ${globalState.isLoading ? 'disabled' : ''}
+                        >
+                            <span id="generateArcPartContentBtnText-${index}">${globalState.arcAIResponse[part] ? `Refine ${part} with AI` : `Expand ${part} with AI`}</span>
+                            <span id="generateArcPartSpinner-${index}" class="hidden">
+                                <svg class="animate-spin-custom -ml-1 mr-2 h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                        </button>
+                    `;
+                    arcPartsContainerElement.appendChild(partDiv);
+
+                    document.getElementById(`arc-part-${index}`).addEventListener('input', (e) => {
+                        globalState.arcInputs[part] = e.target.value;
+                    });
+                    const arcAIResponseTextArea = document.getElementById(`arc-ai-response-${index}`);
+                    if (arcAIResponseTextArea) {
+                        arcAIResponseTextArea.addEventListener('input', (e) => {
+                             globalState.arcAIResponse[part] = e.target.value;
+                        });
+                    }
+                    const arcRefineInput = document.getElementById(`arc-refine-instruction-${index}`);
+                    if (arcRefineInput) {
+                        arcRefineInput.addEventListener('input', (e) => {
+                            globalState.arcRefinementInstruction[part] = e.target.value;
+                        });
+                    }
+                    document.getElementById(`generateArcPartContentBtn-${index}`).addEventListener('click', () => generateArcPartContent(part, arcAIResponseTextArea?.value || ''));
+                });
+            } else {
+                arcStructureDescriptionElement.textContent = '';
+                arcPartsContainerElement.innerHTML = '<p class="text-gray-500 italic text-center py-4">Select a story structure to begin outlining its parts.</p>';
+            }
+            
+            // Element 5: Story Platform & Tone & Length
+            elements.storyPlatform.value = globalState.storyPlatform;
+            elements.storyTone.value = globalState.storyTone;
+            elements.storyLength.value = globalState.storyLength;
+
+            elements.campaignObjectivesContainer.classList.toggle('hidden', globalState.storyPlatform !== 'Social media advertisement');
+            document.querySelectorAll('#campaignObjectivesContainer input[type="checkbox"]').forEach(checkbox => {
+                checkbox.checked = globalState.campaignObjectives.includes(checkbox.value);
+            });
+
+            elements.craftStoryBtnText.textContent = globalState.generatedStory ? 'Refine Story with AI' : 'Craft AI-Powered Story';
+            elements.craftStoryBtn.disabled = globalState.isLoading || !globalState.storyPlatform || !globalState.storyTone || !globalState.storyLength || (globalState.storyPlatform === 'Social media advertisement' && globalState.campaignObjectives.length === 0);
+            elements.craftStorySpinner.classList.toggle('hidden', !globalState.isLoading);
+            elements.craftStoryBtn.querySelector('span:first-child').classList.toggle('hidden', globalState.isLoading);
+
+            elements.generatedStoryContainer.classList.toggle('hidden', !globalState.generatedStory);
+            elements.generatedStory.value = globalState.generatedStory;
+            elements.storyRefineInstruction.value = globalState.storyRefinementInstruction;
+
+            // Element 6: Image Generation
+            elements.imagePromptRefineInstruction.value = globalState.imagePromptRefinementInstruction;
+            elements.generateImagePromptsBtnText.textContent = globalState.imagePrompts.length > 0 ? 'Re-generate Image Prompts' : 'Generate Image Prompts from Story';
+            elements.generateImagePromptsBtn.disabled = globalState.isLoading || !globalState.generatedStory.trim();
+            elements.generateImagePromptsSpinner.classList.toggle('hidden', !globalState.isLoading);
+            elements.generateImagePromptsBtn.querySelector('span:first-child').classList.toggle('hidden', globalState.isLoading);
+
+
+            elements.imagePromptsContainer.classList.toggle('hidden', globalState.imagePrompts.length === 0);
+            elements.imagePromptRadioGroup.innerHTML = '';
+            globalState.imagePrompts.forEach((prompt, index) => {
+                const label = document.createElement('label');
+                label.className = 'flex items-start text-gray-700';
+                label.innerHTML = `
+                    <input type="radio" name="imagePromptSelect" class="form-radio h-5 w-5 text-purple-600 mt-1" value="${prompt}" ${globalState.selectedImagePrompt === prompt ? 'checked' : ''}>
+                    <span class="ml-3 flex-1">${prompt}</span>
+                `;
+                label.querySelector('input').addEventListener('change', (e) => updateState({ selectedImagePrompt: e.target.value }));
+                elements.imagePromptRadioGroup.appendChild(label);
+            });
+            elements.customImagePrompt.value = globalState.selectedImagePrompt; // Ensure custom field reflects selection
+
+            elements.generateImageBtn.disabled = globalState.isGeneratingImage || !globalState.selectedImagePrompt.trim();
+            elements.generateImageSpinner.classList.toggle('hidden', !globalState.isGeneratingImage);
+            elements.generateImageBtn.querySelector('span:first-child').classList.toggle('hidden', globalState.isGeneratingImage);
+
+
+            elements.generatedImageContainer.classList.toggle('hidden', !globalState.generatedImage);
+            elements.generatedImageDisplay.src = globalState.generatedImage;
+
+
+            // Element 7: Social Media Post
+            elements.generateSocialMediaPostBtn.disabled = globalState.isLoading || !globalState.generatedStory.trim() || !globalState.generatedImage.trim() || !globalState.storyPlatform.trim();
+            elements.generateSocialMediaPostBtnText.textContent = globalState.generatedSocialMediaPost ? 'Refine Social Media Post with AI' : 'Generate Social Media Post';
+            elements.socialPostCanvas.classList.toggle('hidden', !globalState.generatedSocialMediaPost || !globalState.generatedImage); // Set visibility based on both
+            elements.generateSocialMediaPostSpinner.classList.toggle('hidden', !globalState.isLoading);
+            elements.generateSocialMediaPostBtn.querySelector('span:first-child').classList.toggle('hidden', globalState.isLoading);
+
+            elements.generatedSocialMediaPostContainer.classList.toggle('hidden', !globalState.generatedSocialMediaPost);
+            elements.generatedSocialMediaPost.value = globalState.generatedSocialMediaPost;
+            
+            // Disable/enable all buttons based on global isLoading state
+            document.querySelectorAll('button').forEach(button => {
+                if (!button.id.includes('Spinner') && button.id !== 'messageCloseButton' && !button.id.includes('Toggle')) {
+                    if (globalState.isLoading || globalState.isGeneratingImage) {
+                         button.disabled = true;
+                         button.classList.add('cursor-not-allowed', 'opacity-50');
+                    } else {
+                         const isControlledBySpecificLogic = [
+                             'generateScenarioBtn', 'addCharacterBtn', 'generateSettingDetailsBtn',
+                             'craftStoryBtn', 'generateImagePromptsBtn', 'generateImageBtn', 'generateSocialMediaPostBtn'
+                         ].includes(button.id);
+                         if (!isControlledBySpecificLogic) {
+                            button.disabled = false;
+                            button.classList.remove('cursor-not-allowed', 'opacity-50');
+                         }
+                    }
+                }
+            });
+
+            // Re-apply specific button disabled states to override global one if needed
+            document.getElementById('generateScenarioBtn').disabled = globalState.isLoading || (!globalState.organizationType.trim() || (globalState.organizationType === 'other' && !globalState.customOrganizationType.trim()));
+            document.getElementById('addCharacterBtn').disabled = globalState.isLoading;
+            document.getElementById('generateSettingDetailsBtn').disabled = globalState.isLoading || (!globalState.settingInputs.timePeriod.trim() && !globalState.settingInputs.geographicalLocation.trim() && !globalState.settingInputs.atmosphereMood.trim() && !globalState.settingAIResponse.trim());
+            document.getElementById('craftStoryBtn').disabled = globalState.isLoading || !globalState.storyPlatform || !globalState.storyTone || !globalState.storyLength || (globalState.storyPlatform === 'Social media advertisement' && globalState.campaignObjectives.length === 0);
+            document.getElementById('generateImagePromptsBtn').disabled = globalState.isLoading || !globalState.generatedStory.trim();
+            document.getElementById('generateImageBtn').disabled = globalState.isGeneratingImage || !globalState.selectedImagePrompt.trim();
+            document.getElementById('generateSocialMediaPostBtn').disabled = globalState.isLoading || !globalState.generatedStory.trim() || !globalState.generatedImage.trim() || !globalState.storyPlatform.trim();
+        }
+        
+
+        // --- Event Listeners and Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get all references to DOM elements
+            elements.messageModal = document.getElementById('messageModal');
+            elements.messageText = document.getElementById('messageText');
+            elements.messageCloseButton = document.getElementById('messageCloseButton');
+
+            elements.guideToggle = document.getElementById('guideToggle');
+            elements.guideContent = document.getElementById('guideContent');
+            elements.guideToggleIcon = document.getElementById('guideToggleIcon');
+
+            elements.orgTypeSelect = document.getElementById('org-type-select');
+            elements.orgTypeDescription = document.getElementById('orgTypeDescription');
+            elements.customOrgTypeInputContainer = document.getElementById('customOrgTypeInputContainer');
+            elements.customOrgTypeInput = document.getElementById('custom-org-type');
+            elements.scenarioContextContainer = document.getElementById('scenarioContextContainer');
+            elements.scenarioContext = document.getElementById('scenarioContext');
+            elements.generateScenarioBtn = document.getElementById('generateScenarioBtn');
+            elements.generateScenarioBtnText = document.getElementById('generateScenarioBtnText');
+            elements.generateScenarioSpinner = document.getElementById('generateScenarioSpinner');
+
+
+            elements.newCharacterArchetype = document.getElementById('new-character-archetype');
+            elements.newCharArchetypeDescription = document.getElementById('newCharArchetypeDescription');
+            elements.newCharacterName = document.getElementById('new-character-name');
+            elements.newCharacterDesc = document.getElementById('new-character-description');
+            elements.addCharacterBtn = document.getElementById('addCharacterBtn');
+            elements.charactersList = document.getElementById('charactersList');
+
+
+            elements.settingTime = document.getElementById('setting-time');
+            elements.settingLocation = document.getElementById('setting-location');
+            elements.settingMood = document.getElementById('setting-mood');
+            elements.settingAIResponseContainer = document.getElementById('settingAIResponseContainer');
+            elements.settingAIResponse = document.getElementById('settingAIResponse');
+            elements.settingRefineInstruction = document.getElementById('setting-refine-instruction');
+            elements.generateSettingDetailsBtn = document.getElementById('generateSettingDetailsBtn');
+            elements.generateSettingDetailsBtnText = document.getElementById('generateSettingDetailsBtnText');
+            elements.generateSettingSpinner = document.getElementById('generateSettingSpinner');
+
+
+            elements.arcSelect = document.getElementById('arc-select');
+            elements.arcStructureDescription = document.getElementById('arcStructureDescription');
+            elements.arcPartsContainer = document.getElementById('arcPartsContainer');
+
+
+            elements.storyPlatform = document.getElementById('story-platform');
+            elements.storyTone = document.getElementById('story-tone');
+            elements.storyLength = document.getElementById('story-length');
+            elements.campaignObjectivesContainer = document.getElementById('campaignObjectivesContainer');
+            elements.craftStoryBtn = document.getElementById('craftStoryBtn');
+            elements.craftStoryBtnText = document.getElementById('craftStoryBtnText');
+            elements.craftStorySpinner = document.getElementById('craftStorySpinner');
+            elements.generatedStoryContainer = document.getElementById('generatedStoryContainer');
+            elements.generatedStory = document.getElementById('generatedStory');
+            elements.storyRefineInstruction = document.getElementById('story-refine-instruction');
+            elements.refineStoryBtn = document.getElementById('refineStoryBtn');
+            elements.refineStoryBtnText = document.getElementById('refineStoryBtnText');
+            elements.refineStorySpinner = document.getElementById('refineStorySpinner');
+            elements.copyStoryBtn = document.getElementById('copyStoryBtn');
+
+            elements.imagePromptRefineInstruction = document.getElementById('image-prompt-refine-instruction');
+            elements.generateImagePromptsBtn = document.getElementById('generateImagePromptsBtn');
+            elements.generateImagePromptsBtnText = document.getElementById('generateImagePromptsBtnText');
+            elements.generateImagePromptsSpinner = document.getElementById('generateImagePromptsSpinner');
+            elements.imagePromptsContainer = document.getElementById('imagePromptsContainer');
+            elements.imagePromptRadioGroup = document.getElementById('imagePromptRadioGroup');
+            elements.customImagePrompt = document.getElementById('custom-image-prompt');
+            elements.generateImageBtn = document.getElementById('generateImageBtn');
+            elements.generateImageBtnText = document.getElementById('generateImageBtnText');
+            elements.generateImageSpinner = document.getElementById('generateImageSpinner');
+            elements.generatedImageContainer = document.getElementById('generatedImageContainer');
+            elements.generatedImageDisplay = document.getElementById('generatedImageDisplay');
+
+
+            elements.generateSocialMediaPostBtn = document.getElementById('generateSocialMediaPostBtn');
+            elements.generateSocialMediaPostBtnText = document.getElementById('generateSocialMediaPostBtnText');
+            elements.generateSocialMediaPostSpinner = document.getElementById('generateSocialMediaPostSpinner');
+            elements.generatedSocialMediaPostContainer = document.getElementById('generatedSocialMediaPostContainer');
+            elements.generatedSocialMediaPost = document.getElementById('generatedSocialMediaPost');
+            elements.socialPostCanvas = document.getElementById('socialPostCanvas');
+            elements.downloadCombinedPostBtn = document.getElementById('downloadCombinedPostBtn');
+
+
+            elements.startNewStoryBtn = document.getElementById('startNewStoryBtn');
+            elements.ethicalGuideToggle = document.getElementById('ethicalGuideToggle');
+            elements.ethicalGuideContent = document.getElementById('ethicalGuideContent');
+            elements.ethicalGuideToggleIcon = document.getElementById('ethicalGuideToggleIcon');
+            elements.tipsGuideToggle = document.getElementById('tipsGuideToggle');
+            elements.tipsGuideContent = document.getElementById('tipsGuideContent');
+            elements.tipsGuideToggleIcon = document.getElementById('tipsGuideToggleIcon');
+            
+
+            // Attach Event Listeners
+            elements.messageCloseButton.addEventListener('click', hideMessage);
+
+            elements.guideToggle.addEventListener('click', () => updateState({ showGuide: !globalState.showGuide }));
+            elements.ethicalGuideToggle.addEventListener('click', () => updateState({ showEthicalGuide: !globalState.showEthicalGuide }));
+            elements.tipsGuideToggle.addEventListener('click', () => updateState({ showTipsGuide: !globalState.showTipsGuide }));
+
+            // Element 1 Listeners
+            elements.orgTypeSelect.addEventListener('change', (e) => updateState({ organizationType: e.target.value, customOrganizationType: '', scenarioContext: '' }));
+            elements.customOrgTypeInput.addEventListener('input', (e) => updateState({ customOrganizationType: e.target.value }));
+            elements.generateScenarioBtn.addEventListener('click', generateScenario);
+
+
+            // Element 2 Listeners
+            elements.newCharacterArchetype.addEventListener('change', (e) => {
+                const selectedArchetype = characterArchetypes.find(a => a.id === e.target.value);
+                elements.newCharArchetypeDescription.textContent = selectedArchetype ? selectedArchetype.description : '';
+                globalState.newCharacterArchetype = e.target.value;
+            });
+            elements.newCharacterName.addEventListener('input', (e) => globalState.newCharacterName = e.target.value );
+            elements.newCharacterDesc.addEventListener('input', (e) => globalState.newCharacterDesc = e.target.value );
+            elements.addCharacterBtn.addEventListener('click', addCharacter);
+
+
+            // Element 3 Listeners
+            elements.settingTime.addEventListener('input', (e) => updateState({ settingInputs: { ...globalState.settingInputs, timePeriod: e.target.value } }));
+            elements.settingLocation.addEventListener('input', (e) => updateState({ settingInputs: { ...globalState.settingInputs, geographicalLocation: e.target.value } }));
+            elements.settingMood.addEventListener('input', (e) => updateState({ settingInputs: { ...globalState.settingInputs, atmosphereMood: e.target.value } }));
+            elements.settingAIResponse.addEventListener('input', (e) => { globalState.settingAIResponse = e.target.value; });
+            elements.settingRefineInstruction.addEventListener('input', (e) => { globalState.settingRefinementInstruction = e.target.value; });
+            elements.generateSettingDetailsBtn.addEventListener('click', () => generateSettingDetails(elements.settingAIResponse.value));
+
+
+            // Element 4 Listeners
+            elements.arcSelect.addEventListener('change', (e) => {
+                updateState({ selectedArc: e.target.value, arcInputs: {}, arcAIResponse: {}, arcRefinementInstruction: {} });
+            });
+
+
+            // Element 5 Listeners
+            elements.storyPlatform.addEventListener('change', (e) => updateState({ storyPlatform: e.target.value, campaignObjectives: [] }) );
+            document.querySelectorAll('#campaignObjectivesContainer input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', (e) => {
+                    const value = e.target.value;
+                    let updatedObjectives = [...globalState.campaignObjectives];
+                    if (e.target.checked) {
+                        if (!updatedObjectives.includes(value)) {
+                           updatedObjectives.push(value);
+                        }
+                    } else {
+                        updatedObjectives = updatedObjectives.filter(obj => obj !== value);
+                    }
+                    updateState({ campaignObjectives: updatedObjectives });
+                });
+            });
+            elements.storyTone.addEventListener('change', (e) => updateState({ storyTone: e.target.value }) );
+            elements.storyLength.addEventListener('change', (e) => updateState({ storyLength: e.target.value }) );
+            elements.craftStoryBtn.addEventListener('click', generateFullStory);
+            elements.generatedStory.addEventListener('input', (e) => globalState.generatedStory = e.target.value );
+            elements.storyRefineInstruction.addEventListener('input', (e) => globalState.storyRefinementInstruction = e.target.value );
+            elements.refineStoryBtn.addEventListener('click', generateFullStory);
+            elements.copyStoryBtn.addEventListener('click', () => {
+                elements.generatedStory.select();
+                document.execCommand('copy');
+                showMessage('Story copied to clipboard!');
+            });
+
+
+            // Element 6 Listeners
+            elements.imagePromptRefineInstruction.addEventListener('input', (e) => globalState.imagePromptRefinementInstruction = e.target.value );
+            elements.generateImagePromptsBtn.addEventListener('click', () => generateImagePrompts());
+            elements.customImagePrompt.addEventListener('input', (e) => globalState.selectedImagePrompt = e.target.value );
+            elements.generateImageBtn.addEventListener('click', generateImage);
+
+
+            // Element 7 Listeners
+            elements.generateSocialMediaPostBtn.addEventListener('click', generateSocialMediaPost);
+            
+            elements.generatedSocialMediaPost.addEventListener('input', (e) => {
+                globalState.generatedSocialMediaPost = e.target.value;
+                drawCombinedPostPreview(e.target.value);
+            });
+            elements.downloadCombinedPostBtn.addEventListener('click', downloadCombinedPost);
+
+
+            elements.startNewStoryBtn.addEventListener('click', startNewStory);
+
+            // Initial render call
+            renderUI();
+            
+            // Initial render for collapsible sections
+            elements.ethicalGuideContent.classList.toggle('expanded', globalState.showEthicalGuide);
+            elements.ethicalGuideToggleIcon.textContent = globalState.showEthicalGuide ? '▲' : '▼';
+            elements.tipsGuideContent.classList.toggle('expanded', globalState.showTipsGuide);
+            elements.tipsGuideToggleIcon.textContent = globalState.showTipsGuide ? '▲' : '▼';
+        });
+
+        // --- Element 2: Characters - Specific Render Function ---
+        function renderCharacters() {
+            elements.charactersList.innerHTML = ''; // Clear current list
+            if (globalState.characters.length === 0) {
+                elements.charactersList.innerHTML = '<p class="text-gray-500 italic text-center py-4">No characters added yet. Start by adding one above!</p>';
+            } else {
+                globalState.characters.forEach(char => {
+                    const charDiv = document.createElement('div');
+                    charDiv.className = 'bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col';
+                    charDiv.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="text-xl font-bold text-gray-800">
+                                ${char.name || `Unnamed ${characterArchetypes.find(a => a.id === char.archetype)?.name}`}
+                                <span class="text-base font-normal text-gray-600 ml-2">(${characterArchetypes.find(a => a.id === char.archetype)?.name})</span>
+                            </h3>
+                            <button class="remove-character-btn ml-4 p-2 text-red-500 hover:text-red-700 transition duration-200 rounded-full hover:bg-gray-200" title="Remove Character" data-char-id="${char.id}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1zm1 3a1 1 0 100 2h4a1 1 0 100-2H8z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="text-gray-700 mb-3">${char.description}</p>
+                        ${char.aiResponse ? `
+                            <div class="mt-2 p-3 bg-white rounded-lg border border-teal-200 text-gray-700 shadow-inner">
+                                <h4 class="font-semibold text-teal-700 mb-2">AI Character Details (Edit Below):</h4>
+                                <textarea
+                                    id="char-ai-response-${char.id}"
+                                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 resize-y min-h-[100px]"
+                                >${char.aiResponse}</textarea>
+                                <div class="mt-3">
+                                    <label for="char-refine-instruction-${char.id}" class="block text-sm font-medium text-gray-700 mb-1">Refinement Instructions for AI (Optional):</label>
+                                    <input
+                                        type="text"
+                                        id="char-refine-instruction-${char.id}"
+                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 transition duration-200"
+                                        placeholder="e.g., Make her more cynical, develop his tragic backstory"
+                                        value="${globalState.characterRefinementInstruction[char.id] || ''}"
+                                    />
+                                </div>
+                            </div>
+                        ` : ''}
+                        <button
+                            id="generateCharacterDetailsBtn-${char.id}"
+                            class="mt-4 px-6 py-2 rounded-lg font-bold text-white transition duration-300 shadow-md transform hover:scale-105 w-full
+                                ${globalState.isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-700'}"
+                            ${globalState.isLoading ? 'disabled' : ''}
+                        >
+                            <span id="generateCharacterDetailsBtnText-${char.id}">${char.aiResponse ? 'Refine Details with AI' : 'Generate Details with AI'}</span>
+                            <span id="generateCharacterDetailsSpinner-${char.id}" class="hidden">
+                                <svg class="animate-spin-custom h-5 w-5 -ml-1 mr-2 text-white" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </span>
+                        </button>
+                    `;
+                    elements.charactersList.appendChild(charDiv);
+
+                    // Re-attach listeners for newly created elements
+                    charDiv.querySelector('.remove-character-btn').addEventListener('click', (e) => removeCharacter(parseInt(e.currentTarget.dataset.charId)));
+                    
+                    const charAIResponseTextArea = document.getElementById(`char-ai-response-${char.id}`);
+                    if (charAIResponseTextArea) {
+                        charAIResponseTextArea.addEventListener('input', (e) => {
+                            updateCharacter(char.id, 'aiResponse', e.target.value);
+                        });
+                    }
+                    const charRefineInput = document.getElementById(`char-refine-instruction-${char.id}`);
+                    if (charRefineInput) {
+                        charRefineInput.addEventListener('input', (e) => {
+                           updateCharacterRefinementInstruction(char.id, e.target.value);
+                        });
+                    }
+                    // Ensure generateCharacterDetails button click re-uses the correct data
+                    document.getElementById(`generateCharacterDetailsBtn-${char.id}`).addEventListener('click', () => {
+                        const currentAiResponse = document.getElementById(`char-ai-response-${char.id}`)?.value || '';
+                        generateCharacterDetails(char.id, currentAiResponse);
+                    });
+                });
+            }
+        }
+    </script>
+</body>
+</html>
