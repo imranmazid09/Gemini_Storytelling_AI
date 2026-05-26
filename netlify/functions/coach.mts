@@ -171,6 +171,12 @@ Use the requested tactic when supplied: Confession, Bold claim, Relatability, Co
 "Best fit", vary tactics appropriately for the campaign mode. Use pattern interrupt and identity call-out
 responsibly; never agitate trauma or vulnerability. Commercial bold claims must be supportable. Advocacy
 and nonprofit hooks must preserve agency and avoid pity, fearmongering or invented testimony.
+For commercial brand work, do not add "guaranteed", "only", "best", superiority comparisons or performance
+promises unless those exact claims are included as approved claims in the brief. If an approved test fact is
+given, a bold claim may state only that supported fact clearly.
+For advocacy or nonprofit work, never write dialogue, first-person testimony, feelings, diagnosis impacts or
+lived experiences for a stakeholder unless the student's approved story already provides those words or facts.
+Use observable actions, design decisions, narrator copy or ambient sound instead.
 Only develop hooks from a story whose recorded alignment status is "Aligned" and story readiness status is
 "Ready for hooks".`,
         prompt: `Develop three distinct hook options from the approved story direction.
