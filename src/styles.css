@@ -844,6 +844,36 @@ main {
   padding: 14px;
 }
 
+.hook-modes {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 16px;
+}
+
+.hook-modes span {
+  background: var(--blue-pale);
+  border-radius: 9px;
+  color: var(--muted);
+  display: grid;
+  font-size: 11px;
+  gap: 2px;
+  padding: 8px;
+}
+
+.hook-modes b {
+  color: var(--blue);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.hook-tactic-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  margin: -9px 0 15px;
+}
+
 .hook-options {
   display: grid;
   gap: 9px;
@@ -872,10 +902,35 @@ main {
   line-height: 1.4;
 }
 
+.hook-options span {
+  color: #52617a;
+  display: grid;
+  font-size: 11px;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.hook-options strong {
+  color: var(--blue);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
 .hook-options small {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.hook-options .hook-label {
+  color: var(--blue);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.hook-options .hook-check {
+  border-top: 1px solid var(--border);
+  padding-top: 7px;
 }
 
 .deliverables {

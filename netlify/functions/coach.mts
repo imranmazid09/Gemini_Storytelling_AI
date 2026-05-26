@@ -19,6 +19,26 @@ function cleanJson(text: string) {
 }
 
 function normalizeResult(action: Action, result: Record<string, unknown>) {
+  if (action === "hooks") {
+    const options = Array.isArray(result.options) ? result.options : [];
+    return {
+      ...result,
+      options: options.map((item) => {
+        const option = item as Record<string, unknown>;
+        return {
+          tactic: String(option.tactic || "Best fit"),
+          trigger: String(option.trigger || "Pattern interrupt"),
+          hook: String(option.hook || ""),
+          visual: String(option.visual || "Show the central moment immediately."),
+          onScreenText: String(option.onScreenText || option.hook || ""),
+          audio: String(option.audio || "Use audio only when the format supports it."),
+          whyItWorks: String(option.whyItWorks || option.rationale || ""),
+          claimCheck: String(option.claimCheck || ""),
+        };
+      }),
+    };
+  }
+
   if (action !== "feedback") {
     return result;
   }
@@ -58,14 +78,27 @@ function promptFor(action: Action, payload: Record<string, unknown>) {
   const shared = `You are StoryLab Pro, an attentive AdPR storytelling coach. Students create social media
 posts or ads for nonprofit or for-profit organizations. Help them make strategic content more human,
 specific, persuasive and respectful. Do not pressure disclosure, invent client claims, exploit hardship,
-or replace student authorship. Return only valid JSON.`;
+or replace student authorship.
+
+Identify the campaign mode before coaching:
+- Commercial brand: connect through a recognizable customer situation, identity or product tension; require
+  credible product proof and never invent performance claims.
+- Nonprofit or community service: connect mission to voluntary action while preserving dignity, agency and
+  accurate impact claims.
+- Advocacy or public-policy: center stakeholder or self-advocate leadership, identify a systemic barrier
+  and a responsible civic action; never fictionalize lived experience or make hardship spectacle.
+- Public-service communication: prioritize clarity, trust, behavioral usefulness and equitable framing.
+A nonprofit can run advocacy and a brand can support a cause. Infer the mode from the objective and brief;
+do not impose advocacy standards on ordinary brand work. Return only valid JSON.`;
 
   switch (action) {
     case "brief":
       return {
         systemInstruction: `${shared}
 Create an editable creative strategy brief between 120 and 180 words. Keep the student's stated facts and
-make an unverified claim explicit as a constraint rather than presenting it as true.`,
+make an unverified claim explicit as a constraint rather than presenting it as true. Resolve an "Other"
+organization, objective or tone through its accompanying custom text. Tailor strategy and CTA standards to
+the campaign mode rather than treating brands, nonprofits and advocacy campaigns as interchangeable.`,
         prompt: `Using these assignment inputs, write the brief.
 ${context}
 Return JSON in this shape: { "brief": "editable brief text" }.`,
@@ -81,19 +114,21 @@ serve its objective, mark it "Needs connection." Mark it "Aligned" only when the
 the student's own draft.
 
 Brief alignment is not story quality. Separately judge whether this is a connecting narrative rather than
-an explanation, proposal or list of claims. "Ready for hooks" requires a clearly focal person or viewpoint
-the audience can follow, a desire or stake, pressure or obstacle, a concrete moment or choice, and an
-observable change tied to the strategic action. A committee, organization or policy idea is context, not a
-central character, unless one participant's viewpoint carries the experience. A story may be aligned and
-still require revision because it lacks that character journey.
+an explanation, proposal or list of claims. For nonprofit and advocacy stories, "Ready for hooks" requires
+a clearly focal person or ethically framed stakeholder viewpoint the audience can follow, a desire or stake,
+pressure or obstacle, a concrete moment or choice, and an observable change tied to the action. A committee,
+organization or policy idea is context, not a central character, unless one participant's viewpoint carries
+the experience. For commercial brand stories, a sharply defined customer situation or use-case can supply
+the focal viewpoint without naming a protagonist, but the tension and credible product role must be concrete.
+A story may be aligned and still require revision because it lacks a connecting human viewpoint.
 
 Give compact Socratic coaching rather than rewriting the story. For every submitted arc field, give one
 specific revision move that teaches the student how to sharpen that beat. Do not write finished replacement
 copy. In advocacy or nonprofit storytelling, recommend consent-based, self-advocate-led or transparently
 composite viewpoints as appropriate; never suggest inventing lived experience or using vulnerability as
-spectacle. Evaluate character depth, emotional clarity, concrete detail, conflict/transformation,
-perspective-taking and ethical storytelling. Do not give a Strong or Exceptional character score when no
-focal character's desire, experience or change appears in the draft.`,
+spectacle. Evaluate focal viewpoint, emotional clarity, concrete detail, conflict/transformation,
+perspective-taking and ethical storytelling. Do not give a Strong or Exceptional focal-viewpoint score when
+the audience has no specific experience, identity, desire or change to enter.`,
         prompt: `Review the student's story-arc draft in relation to its locked brief.
 ${context}
 Return JSON exactly shaped as:
@@ -105,10 +140,10 @@ Return JSON exactly shaped as:
   },
   "storyReadiness": {
     "status": "Ready for hooks|Revise first",
-    "summary": "plain-language verdict about whether an audience can connect through a focal person's experience and change",
-    "priority": "the single most important human-story revision, or an empty string when ready"
+    "summary": "plain-language verdict about whether an audience can enter a focal person or audience viewpoint and its change",
+    "priority": "the single most important connection revision, or an empty string when ready"
   },
-  "connection": "one concise observation about the focal character or missing human viewpoint",
+  "connection": "one concise observation about the focal character or audience viewpoint appropriate to this campaign mode",
   "responsibility": "one concise accuracy/dignity/agency observation",
   "beats": [
     {"stage": "each submitted arc field name exactly, such as Setup", "sharpen": "one specific instructional revision move for this beat without writing the student's finished line"}
@@ -116,7 +151,7 @@ Return JSON exactly shaped as:
   "questions": ["revision question one", "revision question two"],
   "rubric": [
     {"label": "Brief alignment", "level": "Off brief|Needs connection|Aligned"},
-    {"label": "Central character", "level": "Missing|Emerging|Developing|Strong|Exceptional"},
+    {"label": "Focal viewpoint", "level": "Missing|Emerging|Developing|Strong|Exceptional"},
     {"label": "Emotional clarity", "level": "Emerging|Developing|Strong|Exceptional"},
     {"label": "Concrete detail", "level": "Emerging|Developing|Strong|Exceptional"},
     {"label": "Conflict and change", "level": "Missing|Emerging|Developing|Strong|Exceptional"},
@@ -128,19 +163,37 @@ Return JSON exactly shaped as:
     case "hooks":
       return {
         systemInstruction: `${shared}
-Create openings that earn attention through truthful human detail, not exaggeration, pity or empty clickbait.
+The hook is the first three seconds, not a caption paragraph. It must stop the scroll, help the intended
+audience recognize relevance and earn the next five seconds. Create extremely concise openings: the hook
+line must be no longer than 12 words and on-screen text no longer than 8 words. Coordinate three modes:
+what the audience sees immediately, reads immediately and hears immediately when audio is used.
+Use the requested tactic when supplied: Confession, Bold claim, Relatability, Contrast or Curiosity. For
+"Best fit", vary tactics appropriately for the campaign mode. Use pattern interrupt and identity call-out
+responsibly; never agitate trauma or vulnerability. Commercial bold claims must be supportable. Advocacy
+and nonprofit hooks must preserve agency and avoid pity, fearmongering or invented testimony.
 Only develop hooks from a story whose recorded alignment status is "Aligned" and story readiness status is
 "Ready for hooks".`,
         prompt: `Develop three distinct hook options from the approved story direction.
 ${context}
 Return JSON shaped as:
-{ "options": [{ "hook": "one or two sentence hook", "rationale": "brief reason it is truthful and effective" }] }.`,
+{ "options": [{
+  "tactic": "Confession|Bold claim|Relatability|Contrast|Curiosity",
+  "trigger": "Pattern interrupt|Identity call-out|Credible tension",
+  "hook": "hook line, maximum 12 words",
+  "visual": "first-frame visual, one short sentence",
+  "onScreenText": "screen text, maximum 8 words",
+  "audio": "spoken line or sound cue for the opening moment",
+  "whyItWorks": "one short reason this earns attention appropriately",
+  "claimCheck": "support or responsibility check when needed"
+}] }.`,
       };
     case "content":
       return {
         systemInstruction: `${shared}
 Translate the student's approved story and hook into platform-ready social content. Adapt the output to the
-selected static post, carousel, short video or paid ad. For a paid ad, keep claims supportable and the CTA appropriate.`,
+selected static post, carousel, short video or paid ad. Preserve the selected hook execution's visual,
+text and audio logic where it fits the final format. For a paid ad, keep claims supportable and the CTA
+appropriate. Apply the campaign-mode standards rather than making every post sound like advocacy.`,
         prompt: `Create an editable social content draft.
 ${context}
 Return JSON shaped as:

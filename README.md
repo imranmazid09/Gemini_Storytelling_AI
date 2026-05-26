@@ -6,8 +6,8 @@ organization while retaining authorship of the final creative work.
 
 ## Student Flow
 
-1. **Creative Brief**: enter client, audience, objective and platform inputs; generate and edit a strategy brief.
-2. **Story Studio**: draft an arc, receive concise Socratic feedback, and select or revise an emotional hook.
+1. **Creative Brief**: choose organization-sensitive objectives and tone, add any optional approved claim, then generate and edit a strategy brief.
+2. **Story Studio**: draft an arc, receive campaign-aware Socratic feedback, and build a short visual/text/audio hook for the opening moment.
 3. **Content Studio**: generate and edit a static post, carousel, short video concept or paid ad.
 4. **Final Package**: prepare format-relevant execution directions, accessibility checks and an educator snapshot.
 
@@ -15,6 +15,8 @@ AI feedback first checks whether the student's draft is strategically aligned wi
 brief, then separately checks whether it works as a connecting story through a focal character,
 pressure and meaningful change. Students receive concise beat-by-beat revision guidance for their
 selected arc. Hook development remains closed until the story is aligned and story-ready.
+The coach differentiates commercial brand, nonprofit/community-service, advocacy/public-policy
+and public-service communication instead of forcing every assignment into an advocacy pattern.
 
 ## Technology
 
