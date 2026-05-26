@@ -171,7 +171,10 @@ function App() {
         draft: arcText,
       });
       setFeedback(result);
-      record("Story feedback requested", `${ARC_STRUCTURES[arc].label} draft; brief alignment: ${result.alignment?.status || "Review required"}`);
+      record(
+        "Story feedback requested",
+        `${ARC_STRUCTURES[arc].label} draft; brief alignment: ${result.alignment?.status || "Review required"}; story connection: ${result.storyReadiness?.status || "Review required"}`,
+      );
     });
 
   const updateStoryDraft = (field, value) => {
@@ -280,9 +283,12 @@ function App() {
       "",
       "COACHING SNAPSHOT",
       feedback?.alignment ? `Brief alignment: ${feedback.alignment.status} - ${feedback.alignment.summary}` : "",
+      feedback?.storyReadiness ? `Story connection: ${feedback.storyReadiness.status} - ${feedback.storyReadiness.summary}` : "",
       feedback?.connection || "",
-      feedback?.craft || "",
       feedback?.responsibility || "",
+      "",
+      "BEAT-BY-BEAT REVISION GUIDANCE",
+      ...(feedback?.beats || []).map((beat) => `${beat.stage}: ${beat.sharpen}`),
       "",
       "REVISION EVIDENCE",
       ...history.map((entry) => `${entry.time} - ${entry.action}: ${entry.detail}`),
@@ -551,10 +557,12 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
   const structure = ARC_STRUCTURES[arc];
   const hasDraft = structure.fields.every((field) => (drafts[field] || "").trim().length > 8);
   const isAligned = feedback?.alignment?.status === "Aligned";
+  const isStoryReady = feedback?.storyReadiness?.status === "Ready for hooks";
+  const canDevelopHooks = isAligned && isStoryReady;
   return (
     <div className="story-layout">
       <section className="panel">
-        <PanelTitle icon={BookOpen} eyebrow="Step 2" title="Develop your story" description="Write the human foundation first. Feedback stays focused and concise." />
+        <PanelTitle icon={BookOpen} eyebrow="Step 2" title="Develop your story" description="Center a person, a pressure and a change. Coaching stays focused and concise." />
         <div className="arc-selector">
           {Object.entries(ARC_STRUCTURES).map(([key, option]) => (
             <button key={key} className={arc === key ? "chosen" : ""} onClick={() => onArcChange(key)}>
@@ -585,8 +593,19 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
           {feedback ? (
             <div className="coach-results">
               <AlignmentResult alignment={feedback.alignment} />
-              <FeedbackLine title="Connection" text={feedback.connection} />
-              <FeedbackLine title="Craft" text={feedback.craft} />
+              <ReadinessResult readiness={feedback.storyReadiness} />
+              <FeedbackLine title="Human focus" text={feedback.connection} />
+              {(feedback.beats || []).length > 0 && (
+                <div className="beat-coaching">
+                  <b>Sharpen each beat</b>
+                  {(feedback.beats || []).map((beat, index) => (
+                    <article key={`${beat.stage}-${index}`}>
+                      <span>{beat.stage}</span>
+                      <p>{beat.sharpen}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
               <FeedbackLine title="Responsibility" text={feedback.responsibility} />
               <div className="questions">
                 <b>Revision questions</b>
@@ -601,21 +620,25 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
               </div>
             </div>
           ) : (
-            <EmptyState text="Feedback will highlight connection, craft and responsibility without rewriting your story." />
+            <EmptyState text="Feedback will check strategy, human connection and each story beat without rewriting your work." />
           )}
         </section>
-        {feedback && !isAligned && (
+        {feedback && !canDevelopHooks && (
           <section className="panel compact-panel revision-gate">
             <PanelTitle
               icon={RefreshCw}
               eyebrow="Revise first"
-              title="Reconnect the story to the brief"
-              description="Hook development opens after the draft clearly serves the approved strategy."
+              title={isAligned ? "Build a story people can enter" : "Reconnect the story to the brief"}
+              description="Hook development opens after the draft serves the strategy through a human story."
             />
-            <p>{feedback.alignment?.missingLink || "Show how this story supports the organization, audience and objective in the locked brief."}</p>
+            <p>
+              {isAligned
+                ? feedback.storyReadiness?.priority || "Center one person's experience, pressure and meaningful change."
+                : feedback.alignment?.missingLink || "Show how this story supports the organization, audience and objective in the locked brief."}
+            </p>
           </section>
         )}
-        {isAligned && (
+        {canDevelopHooks && (
           <section className="panel compact-panel hook-panel">
             <PanelTitle icon={Sparkles} eyebrow="Hook workshop" title="Sharpen the opening" description="Choose or edit a hook grounded in your story." />
             {!hookOptions.length ? (
@@ -785,7 +808,7 @@ function Principles() {
       <p className="eyebrow">The StoryLab approach</p>
       <h2>AI feedback that sharpens, without taking over.</h2>
       <div className="principle-grid">
-        <article><HeartHandshake size={24} /><h3>Human connection</h3><p>Character, emotional clarity and concrete detail guide each story review.</p></article>
+        <article><HeartHandshake size={24} /><h3>Human connection</h3><p>A focal person, emotional clarity, concrete detail and meaningful change guide each story review.</p></article>
         <article><PenLine size={24} /><h3>Student authorship</h3><p>Students revise, select and approve the creative decisions that become final work.</p></article>
         <article><ShieldCheck size={24} /><h3>Responsible persuasion</h3><p>Feedback checks dignity, accuracy, agency and appropriate calls to action.</p></article>
       </div>
@@ -835,6 +858,21 @@ function AlignmentResult({ alignment }) {
       </div>
       <p>{alignment?.summary || "The story must clearly connect to the locked brief before hook development."}</p>
       {alignment?.missingLink && <small><b>Reconnect by:</b> {alignment.missingLink}</small>}
+    </div>
+  );
+}
+
+function ReadinessResult({ readiness }) {
+  const status = readiness?.status || "Revise first";
+  const tone = status === "Ready for hooks" ? "ready" : "revise";
+  return (
+    <div className={`readiness-result ${tone}`}>
+      <div>
+        <b>Story connection</b>
+        <span>{status}</span>
+      </div>
+      <p>{readiness?.summary || "A connecting story needs a focal person, meaningful pressure and change."}</p>
+      {readiness?.priority && <small><b>Priority:</b> {readiness.priority}</small>}
     </div>
   );
 }

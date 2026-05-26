@@ -12,8 +12,9 @@ organization while retaining authorship of the final creative work.
 4. **Final Package**: prepare format-relevant execution directions, accessibility checks and an educator snapshot.
 
 AI feedback first checks whether the student's draft is strategically aligned with the locked
-brief, then emphasizes human connection, craft and responsible persuasion without writing the
-student's final story for them. Hook development remains closed until the story is aligned.
+brief, then separately checks whether it works as a connecting story through a focal character,
+pressure and meaningful change. Students receive concise beat-by-beat revision guidance for their
+selected arc. Hook development remains closed until the story is aligned and story-ready.
 
 ## Technology
 

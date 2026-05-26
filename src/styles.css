@@ -639,7 +639,8 @@ main {
   gap: 13px;
 }
 
-.alignment-result {
+.alignment-result,
+.readiness-result {
   border: 1px solid #f2c28a;
   border-radius: 11px;
   background: #fff8ed;
@@ -651,19 +652,22 @@ main {
   padding: 14px;
 }
 
-.alignment-result > div {
+.alignment-result > div,
+.readiness-result > div {
   align-items: center;
   display: flex;
   justify-content: space-between;
 }
 
-.alignment-result > div b {
+.alignment-result > div b,
+.readiness-result > div b {
   color: var(--ink);
   font-size: 12px;
   text-transform: uppercase;
 }
 
-.alignment-result > div span {
+.alignment-result > div span,
+.readiness-result > div span {
   background: #fff0d7;
   border-radius: 999px;
   color: #9b5707;
@@ -672,12 +676,14 @@ main {
   padding: 4px 9px;
 }
 
-.alignment-result small {
+.alignment-result small,
+.readiness-result small {
   color: #52617a;
   font-size: 12px;
 }
 
-.alignment-result small b {
+.alignment-result small b,
+.readiness-result small b {
   color: var(--ink);
 }
 
@@ -701,6 +707,21 @@ main {
   color: #b22537;
 }
 
+.readiness-result.revise {
+  background: #fff7f0;
+  border-color: #f0c59a;
+}
+
+.readiness-result.ready {
+  background: #edf9f3;
+  border-color: #98dbb8;
+}
+
+.readiness-result.ready > div span {
+  background: #d9f5e6;
+  color: #087a48;
+}
+
 .feedback-line {
   background: #fafbfe;
   border: 1px solid var(--border);
@@ -720,6 +741,45 @@ main {
   color: #52617a;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.beat-coaching {
+  background: #fafbfe;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  display: grid;
+  gap: 9px;
+  padding: 14px;
+}
+
+.beat-coaching > b {
+  color: var(--blue);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.beat-coaching article {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 4px;
+  padding-top: 9px;
+}
+
+.beat-coaching article:first-of-type {
+  border-top: 0;
+  padding-top: 1px;
+}
+
+.beat-coaching span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.beat-coaching p {
+  color: #52617a;
+  font-size: 13px;
+  line-height: 1.48;
 }
 
 .questions {
