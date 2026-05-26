@@ -1,14 +1,18 @@
-# --- Netlify Configuration File ---
-
-# This file tells Netlify how to build and deploy the site.
-
 [build]
-  # This specifies the directory where Netlify will find the serverless functions.
-  functions = "functions/"
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
 
 [[redirects]]
-  # This rule redirects all API requests from the client-side
-  # to our single serverless function. This is the "front door" for our secure API calls.
-  from = "/api/*"
-  to = "/.netlify/functions/api/:splat"
-  status = 200 # OK
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

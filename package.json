@@ -1,14 +1,28 @@
 {
-  "name": "ai-storytelling-lab-functions",
+  "name": "storylab-pro",
   "version": "1.0.0",
-  "description": "Serverless functions for the AI Storytelling Lab.",
-  "main": "api.js",
+  "private": true,
+  "type": "module",
+  "description": "AI-guided storytelling studio for AdPR social media assignments.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "npm run build"
   },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "node-fetch": "^3.3.2"
+    "@google/genai": "^1.50.1",
+    "@netlify/functions": "^4.2.5",
+    "lucide-react": "^0.511.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@netlify/vite-plugin": "^2.7.1",
+    "@vitejs/plugin-react": "^4.4.1",
+    "vite": "^6.3.5"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
