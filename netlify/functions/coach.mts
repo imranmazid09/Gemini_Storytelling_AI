@@ -18,6 +18,27 @@ function cleanJson(text: string) {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
+function normalizeResult(action: Action, result: Record<string, unknown>) {
+  if (action !== "feedback") {
+    return result;
+  }
+
+  const alignment = result.alignment as Record<string, unknown> | undefined;
+  const validStatuses = ["Aligned", "Needs connection", "Off brief"];
+  if (!alignment || !validStatuses.includes(String(alignment.status))) {
+    return {
+      ...result,
+      alignment: {
+        status: "Needs connection",
+        summary: "The coach could not confirm that this story serves the locked brief yet.",
+        missingLink: "Revise the draft to show how its central human moment supports the organization and objective.",
+      },
+    };
+  }
+
+  return result;
+}
+
 function promptFor(action: Action, payload: Record<string, unknown>) {
   const context = JSON.stringify(payload, null, 2);
   const shared = `You are StoryLab Pro, an attentive AdPR storytelling coach. Students create social media
@@ -38,17 +59,29 @@ Return JSON in this shape: { "brief": "editable brief text" }.`,
     case "feedback":
       return {
         systemInstruction: `${shared}
-Give compact Socratic coaching rather than a rewritten story. Surface only the most useful feedback.
-Evaluate character depth, emotional clarity, concrete detail, transformation, perspective-taking and ethical storytelling.`,
+The locked brief is the strategic standard for the student's story. Before offering craft advice, compare the
+draft directly with the brief's organization, objective, audience, approved message and intended action.
+Never invent a connection that the student did not write. If a draft could belong to a different campaign,
+mark it "Off brief" and state the mismatch plainly. If the draft gestures toward the brief but does not yet
+serve its objective, mark it "Needs connection." Mark it "Aligned" only when the relationship is visible in
+the student's own draft. Give compact Socratic coaching rather than rewriting the story. Evaluate character
+depth, emotional clarity, concrete detail, transformation, perspective-taking and ethical storytelling.
+Do not reward emotional vividness as strategic success when the story is off brief.`,
         prompt: `Review the student's story-arc draft in relation to its locked brief.
 ${context}
 Return JSON exactly shaped as:
 {
+  "alignment": {
+    "status": "Aligned|Needs connection|Off brief",
+    "summary": "direct verdict naming how the draft does or does not serve the locked brief",
+    "missingLink": "the strategic connection the student must establish, or an empty string when aligned"
+  },
   "connection": "one concise strength or priority about human connection",
   "craft": "one concise actionable craft observation",
   "responsibility": "one concise accuracy/dignity/agency observation",
   "questions": ["revision question one", "revision question two"],
   "rubric": [
+    {"label": "Brief alignment", "level": "Off brief|Needs connection|Aligned"},
     {"label": "Character depth", "level": "Emerging|Developing|Strong|Exceptional"},
     {"label": "Emotional clarity", "level": "Emerging|Developing|Strong|Exceptional"},
     {"label": "Ethical storytelling", "level": "Emerging|Developing|Strong|Exceptional"}
@@ -58,7 +91,8 @@ Return JSON exactly shaped as:
     case "hooks":
       return {
         systemInstruction: `${shared}
-Create openings that earn attention through truthful human detail, not exaggeration, pity or empty clickbait.`,
+Create openings that earn attention through truthful human detail, not exaggeration, pity or empty clickbait.
+Only develop hooks from a story whose recorded alignment status is "Aligned" with its locked brief.`,
         prompt: `Develop three distinct hook options from the approved story direction.
 ${context}
 Return JSON shaped as:
@@ -140,13 +174,14 @@ export default async function coach(req: Request, _context: Context) {
       contents: prompt,
       config: {
         systemInstruction,
-        temperature: 0.6,
+        temperature: body.action === "feedback" ? 0.2 : 0.6,
         responseMimeType: "application/json",
       },
     });
 
     const text = result.text || "";
-    return response(JSON.parse(cleanJson(text)));
+    const parsed = JSON.parse(cleanJson(text)) as Record<string, unknown>;
+    return response(normalizeResult(body.action, parsed));
   } catch (error) {
     console.error("StoryLab Gemini request failed", error);
     return response({ error: "AI coaching is temporarily unavailable. Please try again." }, 502);

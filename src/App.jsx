@@ -11,7 +11,6 @@ import {
   LayoutGrid,
   MessageSquareQuote,
   PenLine,
-  Play,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -74,93 +73,6 @@ const sampleBrief = {
   requiredMessage: "A two-hour shift helps stock choice-based grocery shelves.",
 };
 
-const DEMO = {
-  brief: {
-    brief:
-      "Grand River Food Collective connects neighbors with choice-based grocery support while inviting college students into practical community work. The communication objective is to recruit first-time student volunteers through an Instagram organic post. The priority audience cares about local impact but may assume volunteering requires a major time commitment. The story should center one student's realization that a short shift can become a genuine human connection, without depicting community members as passive recipients. Use a warm, credible voice and show a specific moment from a two-hour stocking shift. The audience should feel belonging and useful action before encountering the invitation to volunteer. The post should accurately state that volunteers help stock choice-based grocery shelves and end with a low-pressure invitation to learn about upcoming shifts.",
-  },
-  feedback: {
-    connection:
-      "A student's small hesitation and eventual connection gives the organization a human entry point.",
-    craft:
-      "Your story becomes stronger when the turning point is observable: a conversation, a shelf label, or a shared choice rather than a broad statement about impact.",
-    responsibility:
-      "Keep the neighbor's dignity and agency visible. The volunteer is joining community work, not rescuing someone.",
-    questions: [
-      "What exact moment changes the student's understanding of volunteering?",
-      "What detail shows choice and dignity in the grocery experience?",
-    ],
-    rubric: [
-      { label: "Character depth", level: "Developing" },
-      { label: "Emotional clarity", level: "Strong" },
-      { label: "Ethical storytelling", level: "Strong" },
-    ],
-  },
-  hooks: {
-    options: [
-      {
-        hook: "I signed up for two hours. I did not expect to leave knowing my neighbors differently.",
-        rationale: "Personal and specific; it opens curiosity without overstating need.",
-      },
-      {
-        hook: "The smallest part of my week became the moment I felt most connected to this city.",
-        rationale: "Signals transformation and speaks to time-conscious students.",
-      },
-      {
-        hook: "A shelf, a grocery list, and one conversation changed what volunteering meant to me.",
-        rationale: "Uses concrete detail while leaving room for the story to unfold.",
-      },
-    ],
-  },
-  content: {
-    primaryText:
-      "I signed up for two hours. I did not expect to leave knowing my neighbors differently.\n\nAt Grand River Food Collective, stocking choice-based shelves is more than moving groceries. It is helping create a space where neighbors choose what works for their families, with dignity at the center.\n\nHave two hours this month? Join a student volunteer shift.",
-    headline: "Two hours. A more connected community.",
-    cta: "View volunteer shifts",
-    visualDirection:
-      "Natural-light photo of a student volunteer organizing clearly labeled shelves alongside a community staff member; warm, active and respectful rather than staged hardship.",
-    altText:
-      "Student volunteer and food collective staff member arrange groceries on choice-based pantry shelves.",
-    ethicalCheck:
-      "Agency is retained by focusing on a shared community space rather than depicting an identifiable person in need.",
-    frames: [
-      { title: "Opening", copy: "I signed up for two hours.", visual: "Hands placing pantry labels on a shelf." },
-      { title: "Human moment", copy: "Choice matters.", visual: "Organized shelves and welcoming signage." },
-      { title: "Invitation", copy: "Volunteer this month.", visual: "Student and staff member smiling while working." },
-    ],
-  },
-  production: {
-    summary: "Instagram organic post package built around a credible volunteer transformation.",
-    scenes: [
-      {
-        stage: "Opening image",
-        time: "Frame 1",
-        visual: "Close detail of hands stocking labeled shelves in warm natural light.",
-        audio: "Not applicable",
-        onScreen: "I signed up for two hours.",
-      },
-      {
-        stage: "Connection",
-        time: "Frame 2",
-        visual: "Student volunteer and staff member working together in an inviting pantry space.",
-        audio: "Not applicable",
-        onScreen: "Choice-based support. Community-centered work.",
-      },
-      {
-        stage: "Action",
-        time: "Frame 3",
-        visual: "Clean organization-branded close with volunteer sign-up direction.",
-        audio: "Not applicable",
-        onScreen: "Join a student volunteer shift.",
-      },
-    ],
-    accessibility:
-      "Use the prepared alt text, ensure text contrast meets accessibility standards, and repeat the volunteer link in the caption.",
-    educatorSummary:
-      "The concept translates a strategic objective into a specific human moment and avoids pity-based nonprofit framing.",
-  },
-};
-
 function App() {
   const [stage, setStage] = useState(1);
   const [briefInput, setBriefInput] = useState(initialBrief);
@@ -179,7 +91,7 @@ function App() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
-  const [sampleMode, setSampleMode] = useState(false);
+  const [exampleLoaded, setExampleLoaded] = useState(false);
 
   const arcText = useMemo(
     () =>
@@ -189,14 +101,14 @@ function App() {
     [arc, arcDrafts],
   );
 
-  const updateBrief = (field, value) => setBriefInput((previous) => ({ ...previous, [field]: value }));
+  const updateBrief = (field, value) => {
+    setExampleLoaded(false);
+    setBriefInput((previous) => ({ ...previous, [field]: value }));
+  };
   const record = (action, detail) =>
     setHistory((previous) => [...previous, { action, detail, time: new Date().toLocaleTimeString() }]);
 
   const requestCoach = async (action, payload) => {
-    if (sampleMode) {
-      return DEMO[action];
-    }
     const response = await fetch("/api/coach", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -222,12 +134,9 @@ function App() {
   };
 
   const fillSample = () => {
-    setSampleMode(true);
+    resetProject();
+    setExampleLoaded(true);
     setBriefInput(sampleBrief);
-    setBriefText("");
-    setLockedBrief("");
-    setStage(1);
-    setError("");
   };
 
   const generateBrief = () =>
@@ -239,20 +148,41 @@ function App() {
 
   const lockBrief = () => {
     setLockedBrief(briefText);
+    setArcDrafts({});
+    setFeedback(null);
+    setHookOptions([]);
+    setSelectedHook("");
+    setStoryLocked(false);
+    setContent(null);
+    setContentLocked(false);
+    setProduction(null);
     record("Brief locked", "Student reviewed and approved the editable brief");
     setStage(2);
   };
 
   const getStoryFeedback = () =>
     run("feedback", async () => {
+      setHookOptions([]);
+      setSelectedHook("");
+      setStoryLocked(false);
       const result = await requestCoach("feedback", {
         brief: lockedBrief,
         arc: ARC_STRUCTURES[arc].label,
         draft: arcText,
       });
       setFeedback(result);
-      record("Story feedback requested", `${ARC_STRUCTURES[arc].label} draft reviewed`);
+      record("Story feedback requested", `${ARC_STRUCTURES[arc].label} draft; brief alignment: ${result.alignment?.status || "Review required"}`);
     });
+
+  const updateStoryDraft = (field, value) => {
+    setArcDrafts((previous) => ({ ...previous, [field]: value }));
+    if (feedback || hookOptions.length || selectedHook) {
+      setFeedback(null);
+      setHookOptions([]);
+      setSelectedHook("");
+      setStoryLocked(false);
+    }
+  };
 
   const generateHooks = () =>
     run("hooks", async () => {
@@ -323,7 +253,7 @@ function App() {
     setContentLocked(false);
     setProduction(null);
     setHistory([]);
-    setSampleMode(false);
+    setExampleLoaded(false);
     setError("");
   };
 
@@ -349,6 +279,7 @@ function App() {
       content?.cta ? `CTA: ${content.cta}` : "",
       "",
       "COACHING SNAPSHOT",
+      feedback?.alignment ? `Brief alignment: ${feedback.alignment.status} - ${feedback.alignment.summary}` : "",
       feedback?.connection || "",
       feedback?.craft || "",
       feedback?.responsibility || "",
@@ -386,7 +317,7 @@ function App() {
               <p className="eyebrow">Student Workspace</p>
               <h2>Build one story. Sharpen every decision.</h2>
             </div>
-            {sampleMode && <span className="sample-pill">Sample preview mode</span>}
+            {exampleLoaded && <span className="sample-pill">Example inputs loaded - edit freely</span>}
           </div>
           <StageNav stage={stage} canVisit={canVisit} onSelect={setStage} />
           {error && <div className="error-banner">{error}</div>}
@@ -412,7 +343,7 @@ function App() {
                 setSelectedHook("");
               }}
               drafts={arcDrafts}
-              onDraftChange={(field, value) => setArcDrafts((previous) => ({ ...previous, [field]: value }))}
+              onDraftChange={updateStoryDraft}
               feedback={feedback}
               hookOptions={hookOptions}
               selectedHook={selectedHook}
@@ -492,7 +423,7 @@ function Hero({ onStart, onSample }) {
             Start a project <ArrowRight size={18} />
           </a>
           <button className="secondary-button" onClick={onSample}>
-            <Play size={17} /> Preview sample
+            <Sparkles size={17} /> Load example inputs
           </button>
         </div>
         <div className="trust-row">
@@ -619,6 +550,7 @@ function BriefStage({ values, onUpdate, briefText, onTextChange, onGenerate, onL
 function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOptions, selectedHook, onHookChange, onFeedback, onHooks, onLock, loading }) {
   const structure = ARC_STRUCTURES[arc];
   const hasDraft = structure.fields.every((field) => (drafts[field] || "").trim().length > 8);
+  const isAligned = feedback?.alignment?.status === "Aligned";
   return (
     <div className="story-layout">
       <section className="panel">
@@ -649,14 +581,18 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
       </section>
       <aside className="story-aside">
         <section className="panel compact-panel">
-          <PanelTitle icon={HeartHandshake} eyebrow="Coach" title="Three useful signals" />
+          <PanelTitle icon={HeartHandshake} eyebrow="Coach" title="Feedback grounded in your brief" />
           {feedback ? (
             <div className="coach-results">
+              <AlignmentResult alignment={feedback.alignment} />
               <FeedbackLine title="Connection" text={feedback.connection} />
               <FeedbackLine title="Craft" text={feedback.craft} />
               <FeedbackLine title="Responsibility" text={feedback.responsibility} />
               <div className="questions">
-                {(feedback.questions || []).map((question) => <p key={question}>{question}</p>)}
+                <b>Revision questions</b>
+                <ol>
+                  {(feedback.questions || []).map((question) => <li key={question}>{question}</li>)}
+                </ol>
               </div>
               <div className="rubric-chips">
                 {(feedback.rubric || []).map((item) => (
@@ -668,7 +604,18 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
             <EmptyState text="Feedback will highlight connection, craft and responsibility without rewriting your story." />
           )}
         </section>
-        {feedback && (
+        {feedback && !isAligned && (
+          <section className="panel compact-panel revision-gate">
+            <PanelTitle
+              icon={RefreshCw}
+              eyebrow="Revise first"
+              title="Reconnect the story to the brief"
+              description="Hook development opens after the draft clearly serves the approved strategy."
+            />
+            <p>{feedback.alignment?.missingLink || "Show how this story supports the organization, audience and objective in the locked brief."}</p>
+          </section>
+        )}
+        {isAligned && (
           <section className="panel compact-panel hook-panel">
             <PanelTitle icon={Sparkles} eyebrow="Hook workshop" title="Sharpen the opening" description="Choose or edit a hook grounded in your story." />
             {!hookOptions.length ? (
@@ -874,6 +821,21 @@ function Field({ label, children, wide }) {
       <span>{label}</span>
       {children}
     </label>
+  );
+}
+
+function AlignmentResult({ alignment }) {
+  const status = alignment?.status || "Needs connection";
+  const tone = status === "Aligned" ? "aligned" : status === "Off brief" ? "off-brief" : "needs-connection";
+  return (
+    <div className={`alignment-result ${tone}`}>
+      <div>
+        <b>Brief alignment</b>
+        <span>{status}</span>
+      </div>
+      <p>{alignment?.summary || "The story must clearly connect to the locked brief before hook development."}</p>
+      {alignment?.missingLink && <small><b>Reconnect by:</b> {alignment.missingLink}</small>}
+    </div>
   );
 }
 

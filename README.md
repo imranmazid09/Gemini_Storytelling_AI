@@ -11,8 +11,9 @@ organization while retaining authorship of the final creative work.
 3. **Content Studio**: generate and edit a static post, carousel, short video concept or paid ad.
 4. **Final Package**: prepare format-relevant execution directions, accessibility checks and an educator snapshot.
 
-AI feedback emphasizes human connection, craft and responsible persuasion instead of presenting
-constant grades or writing the student's final story for them.
+AI feedback first checks whether the student's draft is strategically aligned with the locked
+brief, then emphasizes human connection, craft and responsible persuasion without writing the
+student's final story for them. Hook development remains closed until the story is aligned.
 
 ## Technology
 
@@ -30,8 +31,9 @@ npm install
 npm run dev
 ```
 
-The interface includes **Preview sample** mode for testing the workflow without making AI calls.
-To test live coaching locally, configure Netlify development environment variables for the site.
+The interface includes **Load example inputs** to start with a sample assignment; coaching
+responses still come from the live AI service so that revisions receive honest feedback.
+To test coaching locally, configure Netlify development environment variables for the site.
 
 ## Netlify Deployment
 

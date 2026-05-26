@@ -639,6 +639,68 @@ main {
   gap: 13px;
 }
 
+.alignment-result {
+  border: 1px solid #f2c28a;
+  border-radius: 11px;
+  background: #fff8ed;
+  color: #52617a;
+  display: grid;
+  font-size: 13px;
+  gap: 8px;
+  line-height: 1.48;
+  padding: 14px;
+}
+
+.alignment-result > div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.alignment-result > div b {
+  color: var(--ink);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.alignment-result > div span {
+  background: #fff0d7;
+  border-radius: 999px;
+  color: #9b5707;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+}
+
+.alignment-result small {
+  color: #52617a;
+  font-size: 12px;
+}
+
+.alignment-result small b {
+  color: var(--ink);
+}
+
+.alignment-result.aligned {
+  background: #edf9f3;
+  border-color: #98dbb8;
+}
+
+.alignment-result.aligned > div span {
+  background: #d9f5e6;
+  color: #087a48;
+}
+
+.alignment-result.off-brief {
+  background: #fff2f2;
+  border-color: #edb2b5;
+}
+
+.alignment-result.off-brief > div span {
+  background: #fee1e2;
+  color: #b22537;
+}
+
 .feedback-line {
   background: #fafbfe;
   border: 1px solid var(--border);
@@ -671,11 +733,26 @@ main {
   padding: 14px;
 }
 
-.questions p::before {
+.questions b {
   color: var(--blue);
-  content: "?";
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.questions ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.questions li {
+  padding-left: 3px;
+}
+
+.questions li::marker {
+  color: var(--blue);
   font-weight: 700;
-  margin-right: 9px;
 }
 
 .rubric-chips {
@@ -696,6 +773,15 @@ main {
 
 .rubric-chips b {
   color: var(--ink);
+}
+
+.revision-gate p {
+  background: var(--blue-pale);
+  border-radius: 11px;
+  color: #52617a;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 14px;
 }
 
 .hook-options {
