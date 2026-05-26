@@ -173,7 +173,9 @@ responsibly; never agitate trauma or vulnerability. Commercial bold claims must 
 and nonprofit hooks must preserve agency and avoid pity, fearmongering or invented testimony.
 For commercial brand work, do not add "guaranteed", "only", "best", superiority comparisons or performance
 promises unless those exact claims are included as approved claims in the brief. If an approved test fact is
-given, a bold claim may state only that supported fact clearly.
+given, a bold claim may state only that supported fact clearly. Do not invent proof demonstrations, test
+conditions, temperature readings, percentages or numbers beyond the approved fact in the brief, including
+in the visual concept or on-screen text.
 For advocacy or nonprofit work, never write dialogue, first-person testimony, feelings, diagnosis impacts or
 lived experiences for a stakeholder unless the student's approved story already provides those words or facts.
 Use observable actions, design decisions, narrator copy or ambient sound instead.
