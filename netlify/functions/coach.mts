@@ -23,20 +23,34 @@ function normalizeResult(action: Action, result: Record<string, unknown>) {
     return result;
   }
 
+  const normalized = { ...result };
   const alignment = result.alignment as Record<string, unknown> | undefined;
   const validStatuses = ["Aligned", "Needs connection", "Off brief"];
   if (!alignment || !validStatuses.includes(String(alignment.status))) {
-    return {
-      ...result,
-      alignment: {
-        status: "Needs connection",
-        summary: "The coach could not confirm that this story serves the locked brief yet.",
-        missingLink: "Revise the draft to show how its central human moment supports the organization and objective.",
-      },
+    normalized.alignment = {
+      status: "Needs connection",
+      summary: "The coach could not confirm that this story serves the locked brief yet.",
+      missingLink: "Revise the draft to show how its central human moment supports the organization and objective.",
     };
   }
 
-  return result;
+  const normalizedAlignment = normalized.alignment as Record<string, unknown>;
+  const readiness = result.storyReadiness as Record<string, unknown> | undefined;
+  const validReadiness = ["Ready for hooks", "Revise first"];
+  if (!readiness || !validReadiness.includes(String(readiness.status))) {
+    normalized.storyReadiness = {
+      status: "Revise first",
+      summary: "The story needs a visible focal person, pressure and meaningful change before hook development.",
+      priority: "Center one ethical, specific viewpoint and show what changes for that person.",
+    };
+  } else if (normalizedAlignment.status !== "Aligned") {
+    normalized.storyReadiness = {
+      ...readiness,
+      status: "Revise first",
+    };
+  }
+
+  return normalized;
 }
 
 function promptFor(action: Action, payload: Record<string, unknown>) {
@@ -64,9 +78,22 @@ draft directly with the brief's organization, objective, audience, approved mess
 Never invent a connection that the student did not write. If a draft could belong to a different campaign,
 mark it "Off brief" and state the mismatch plainly. If the draft gestures toward the brief but does not yet
 serve its objective, mark it "Needs connection." Mark it "Aligned" only when the relationship is visible in
-the student's own draft. Give compact Socratic coaching rather than rewriting the story. Evaluate character
-depth, emotional clarity, concrete detail, transformation, perspective-taking and ethical storytelling.
-Do not reward emotional vividness as strategic success when the story is off brief.`,
+the student's own draft.
+
+Brief alignment is not story quality. Separately judge whether this is a connecting narrative rather than
+an explanation, proposal or list of claims. "Ready for hooks" requires a clearly focal person or viewpoint
+the audience can follow, a desire or stake, pressure or obstacle, a concrete moment or choice, and an
+observable change tied to the strategic action. A committee, organization or policy idea is context, not a
+central character, unless one participant's viewpoint carries the experience. A story may be aligned and
+still require revision because it lacks that character journey.
+
+Give compact Socratic coaching rather than rewriting the story. For every submitted arc field, give one
+specific revision move that teaches the student how to sharpen that beat. Do not write finished replacement
+copy. In advocacy or nonprofit storytelling, recommend consent-based, self-advocate-led or transparently
+composite viewpoints as appropriate; never suggest inventing lived experience or using vulnerability as
+spectacle. Evaluate character depth, emotional clarity, concrete detail, conflict/transformation,
+perspective-taking and ethical storytelling. Do not give a Strong or Exceptional character score when no
+focal character's desire, experience or change appears in the draft.`,
         prompt: `Review the student's story-arc draft in relation to its locked brief.
 ${context}
 Return JSON exactly shaped as:
@@ -76,14 +103,24 @@ Return JSON exactly shaped as:
     "summary": "direct verdict naming how the draft does or does not serve the locked brief",
     "missingLink": "the strategic connection the student must establish, or an empty string when aligned"
   },
-  "connection": "one concise strength or priority about human connection",
-  "craft": "one concise actionable craft observation",
+  "storyReadiness": {
+    "status": "Ready for hooks|Revise first",
+    "summary": "plain-language verdict about whether an audience can connect through a focal person's experience and change",
+    "priority": "the single most important human-story revision, or an empty string when ready"
+  },
+  "connection": "one concise observation about the focal character or missing human viewpoint",
   "responsibility": "one concise accuracy/dignity/agency observation",
+  "beats": [
+    {"stage": "each submitted arc field name exactly, such as Setup", "sharpen": "one specific instructional revision move for this beat without writing the student's finished line"}
+  ],
   "questions": ["revision question one", "revision question two"],
   "rubric": [
     {"label": "Brief alignment", "level": "Off brief|Needs connection|Aligned"},
-    {"label": "Character depth", "level": "Emerging|Developing|Strong|Exceptional"},
+    {"label": "Central character", "level": "Missing|Emerging|Developing|Strong|Exceptional"},
     {"label": "Emotional clarity", "level": "Emerging|Developing|Strong|Exceptional"},
+    {"label": "Concrete detail", "level": "Emerging|Developing|Strong|Exceptional"},
+    {"label": "Conflict and change", "level": "Missing|Emerging|Developing|Strong|Exceptional"},
+    {"label": "Perspective-taking", "level": "Emerging|Developing|Strong|Exceptional"},
     {"label": "Ethical storytelling", "level": "Emerging|Developing|Strong|Exceptional"}
   ]
 }.`,
@@ -92,7 +129,8 @@ Return JSON exactly shaped as:
       return {
         systemInstruction: `${shared}
 Create openings that earn attention through truthful human detail, not exaggeration, pity or empty clickbait.
-Only develop hooks from a story whose recorded alignment status is "Aligned" with its locked brief.`,
+Only develop hooks from a story whose recorded alignment status is "Aligned" and story readiness status is
+"Ready for hooks".`,
         prompt: `Develop three distinct hook options from the approved story direction.
 ${context}
 Return JSON shaped as:
