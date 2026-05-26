@@ -49,27 +49,109 @@ const DELIVERABLES = [
   { id: "paid", name: "Paid Ad", output: "Primary text, headline, CTA and claim check" },
 ];
 
+const ORGANIZATION_TYPES = [
+  "Nonprofit",
+  "For-profit brand",
+  "Advocacy or civic coalition",
+  "Public service",
+  "Social enterprise",
+  "Other",
+];
+
+const OBJECTIVES_BY_ORG = {
+  Nonprofit: [
+    "Build awareness",
+    "Recruit volunteers",
+    "Raise donations",
+    "Increase program participation",
+    "Advocate for policy change",
+    "Engage supporters",
+    "Other",
+  ],
+  "For-profit brand": [
+    "Build brand awareness",
+    "Launch a product",
+    "Increase consideration",
+    "Encourage trial",
+    "Drive purchase",
+    "Build loyalty",
+    "Other",
+  ],
+  "Advocacy or civic coalition": [
+    "Mobilize public support",
+    "Influence policy",
+    "Engage lawmakers",
+    "Recruit coalition members",
+    "Raise advocacy funding",
+    "Other",
+  ],
+  "Public service": [
+    "Inform the public",
+    "Promote behavior change",
+    "Increase service use",
+    "Build public trust",
+    "Encourage preparedness",
+    "Other",
+  ],
+  "Social enterprise": [
+    "Build awareness",
+    "Increase consideration",
+    "Drive purchase",
+    "Demonstrate social impact",
+    "Invite community action",
+    "Other",
+  ],
+  Other: ["Build awareness", "Drive action", "Invite engagement", "Other"],
+};
+
+const TONE_OPTIONS = [
+  "Warm and credible",
+  "Hopeful and empowering",
+  "Conversational and relatable",
+  "Bold and confident",
+  "Urgent but respectful",
+  "Playful and energetic",
+  "Premium and refined",
+  "Educational and clear",
+  "Other",
+];
+
+const HOOK_TACTICS = [
+  { id: "recommended", name: "Best fit", description: "Let the coach choose for this campaign." },
+  { id: "confession", name: "Confession", description: "A candid mistake or changed belief." },
+  { id: "bold-claim", name: "Bold claim", description: "A supportable statement to prove." },
+  { id: "relatability", name: "Relatability", description: "Specific language that signals this is for me." },
+  { id: "contrast", name: "Contrast", description: "Old way versus a meaningful alternative." },
+  { id: "curiosity", name: "Curiosity", description: "Open a truthful question worth staying for." },
+];
+
 const initialBrief = {
   organization: "",
   orgType: "Nonprofit",
+  customOrgType: "",
   objective: "Build awareness",
+  customObjective: "",
   audience: "",
   platform: "Instagram",
   placement: "Organic post",
   desiredEmotion: "Hope grounded in action",
   tone: "Warm and credible",
+  customTone: "",
   requiredMessage: "",
 };
 
 const sampleBrief = {
   organization: "Grand River Food Collective",
   orgType: "Nonprofit",
-  objective: "Recruit student volunteers",
+  customOrgType: "",
+  objective: "Recruit volunteers",
+  customObjective: "",
   audience: "College students who care about community but have limited time",
   platform: "Instagram",
   placement: "Organic post",
   desiredEmotion: "Belonging and useful action",
   tone: "Warm and credible",
+  customTone: "",
   requiredMessage: "A two-hour shift helps stock choice-based grocery shelves.",
 };
 
@@ -83,6 +165,8 @@ function App() {
   const [feedback, setFeedback] = useState(null);
   const [hookOptions, setHookOptions] = useState([]);
   const [selectedHook, setSelectedHook] = useState("");
+  const [selectedHookPlan, setSelectedHookPlan] = useState(null);
+  const [hookTactic, setHookTactic] = useState("recommended");
   const [storyLocked, setStoryLocked] = useState(false);
   const [deliverable, setDeliverable] = useState("static");
   const [content, setContent] = useState(null);
@@ -152,6 +236,8 @@ function App() {
     setFeedback(null);
     setHookOptions([]);
     setSelectedHook("");
+    setSelectedHookPlan(null);
+    setHookTactic("recommended");
     setStoryLocked(false);
     setContent(null);
     setContentLocked(false);
@@ -164,6 +250,7 @@ function App() {
     run("feedback", async () => {
       setHookOptions([]);
       setSelectedHook("");
+      setSelectedHookPlan(null);
       setStoryLocked(false);
       const result = await requestCoach("feedback", {
         brief: lockedBrief,
@@ -183,6 +270,7 @@ function App() {
       setFeedback(null);
       setHookOptions([]);
       setSelectedHook("");
+      setSelectedHookPlan(null);
       setStoryLocked(false);
     }
   };
@@ -194,6 +282,11 @@ function App() {
         arc: ARC_STRUCTURES[arc].label,
         draft: arcText,
         feedback,
+        organizationType: briefInput.orgType === "Other" ? briefInput.customOrgType : briefInput.orgType,
+        objective: briefInput.objective === "Other" ? briefInput.customObjective : briefInput.objective,
+        platform: briefInput.platform,
+        placement: briefInput.placement,
+        tactic: HOOK_TACTICS.find((option) => option.id === hookTactic)?.name,
       });
       setHookOptions(result.options || []);
       record("Hook options requested", "Emotion-focused openings considered");
@@ -211,6 +304,7 @@ function App() {
         brief: lockedBrief,
         story: arcText,
         hook: selectedHook,
+        hookExecution: selectedHookPlan,
         deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
         platform: briefInput.platform,
         placement: briefInput.placement,
@@ -232,6 +326,7 @@ function App() {
         brief: lockedBrief,
         story: arcText,
         hook: selectedHook,
+        hookExecution: selectedHookPlan,
         deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
         content,
         platform: briefInput.platform,
@@ -250,6 +345,8 @@ function App() {
     setFeedback(null);
     setHookOptions([]);
     setSelectedHook("");
+    setSelectedHookPlan(null);
+    setHookTactic("recommended");
     setStoryLocked(false);
     setDeliverable("static");
     setContent(null);
@@ -275,6 +372,9 @@ function App() {
       "",
       "SELECTED HOOK",
       selectedHook,
+      selectedHookPlan?.visual ? `Visual: ${selectedHookPlan.visual}` : "",
+      selectedHookPlan?.onScreenText ? `Text: ${selectedHookPlan.onScreenText}` : "",
+      selectedHookPlan?.audio ? `Audio: ${selectedHookPlan.audio}` : "",
       "",
       "FINAL CONTENT",
       content?.primaryText || "",
@@ -347,13 +447,29 @@ function App() {
                 setFeedback(null);
                 setHookOptions([]);
                 setSelectedHook("");
+                setSelectedHookPlan(null);
+                setHookTactic("recommended");
               }}
               drafts={arcDrafts}
               onDraftChange={updateStoryDraft}
               feedback={feedback}
               hookOptions={hookOptions}
               selectedHook={selectedHook}
-              onHookChange={setSelectedHook}
+              hookTactic={hookTactic}
+              onHookTactic={(nextTactic) => {
+                setHookTactic(nextTactic);
+                setHookOptions([]);
+                setSelectedHook("");
+                setSelectedHookPlan(null);
+              }}
+              onSelectHook={(option) => {
+                setSelectedHook(option.hook);
+                setSelectedHookPlan(option);
+              }}
+              onHookChange={(value) => {
+                setSelectedHook(value);
+                setSelectedHookPlan((previous) => previous ? { ...previous, hook: value } : { hook: value });
+              }}
               onFeedback={getStoryFeedback}
               onHooks={generateHooks}
               onLock={lockStory}
@@ -490,6 +606,17 @@ function StageNav({ stage, canVisit, onSelect }) {
 }
 
 function BriefStage({ values, onUpdate, briefText, onTextChange, onGenerate, onLock, loading }) {
+  const objectives = OBJECTIVES_BY_ORG[values.orgType] || OBJECTIVES_BY_ORG.Other;
+  const missingCustomValue =
+    (values.orgType === "Other" && !values.customOrgType.trim()) ||
+    (values.objective === "Other" && !values.customObjective.trim()) ||
+    (values.tone === "Other" && !values.customTone.trim());
+  const updateOrganizationType = (type) => {
+    onUpdate("orgType", type);
+    onUpdate("customOrgType", "");
+    onUpdate("objective", OBJECTIVES_BY_ORG[type]?.[0] || OBJECTIVES_BY_ORG.Other[0]);
+    onUpdate("customObjective", "");
+  };
   return (
     <div className="workspace-grid">
       <section className="panel">
@@ -499,15 +626,25 @@ function BriefStage({ values, onUpdate, briefText, onTextChange, onGenerate, onL
             <input value={values.organization} onChange={(event) => onUpdate("organization", event.target.value)} placeholder="Organization or brand name" />
           </Field>
           <Field label="Organization type">
-            <select value={values.orgType} onChange={(event) => onUpdate("orgType", event.target.value)}>
-              {["Nonprofit", "For-profit brand", "Public service", "Social enterprise"].map((item) => <option key={item}>{item}</option>)}
+            <select value={values.orgType} onChange={(event) => updateOrganizationType(event.target.value)}>
+              {ORGANIZATION_TYPES.map((item) => <option key={item}>{item}</option>)}
             </select>
           </Field>
+          {values.orgType === "Other" && (
+            <Field label="Describe organization type">
+              <input value={values.customOrgType} onChange={(event) => onUpdate("customOrgType", event.target.value)} placeholder="e.g., Student initiative" />
+            </Field>
+          )}
           <Field label="Objective">
             <select value={values.objective} onChange={(event) => onUpdate("objective", event.target.value)}>
-              {["Build awareness", "Recruit volunteers", "Drive donations", "Promote a product", "Increase consideration", "Invite engagement"].map((item) => <option key={item}>{item}</option>)}
+              {objectives.map((item) => <option key={item}>{item}</option>)}
             </select>
           </Field>
+          {values.objective === "Other" && (
+            <Field label="Describe objective">
+              <input value={values.customObjective} onChange={(event) => onUpdate("customObjective", event.target.value)} placeholder="What should this communication accomplish?" />
+            </Field>
+          )}
           <Field label="Audience" wide>
             <textarea rows="3" value={values.audience} onChange={(event) => onUpdate("audience", event.target.value)} placeholder="Who should this story reach, and what matters to them?" />
           </Field>
@@ -525,13 +662,20 @@ function BriefStage({ values, onUpdate, briefText, onTextChange, onGenerate, onL
             <input value={values.desiredEmotion} onChange={(event) => onUpdate("desiredEmotion", event.target.value)} />
           </Field>
           <Field label="Tone">
-            <input value={values.tone} onChange={(event) => onUpdate("tone", event.target.value)} />
+            <select value={values.tone} onChange={(event) => onUpdate("tone", event.target.value)}>
+              {TONE_OPTIONS.map((item) => <option key={item}>{item}</option>)}
+            </select>
           </Field>
-          <Field label="Required message or approved claim" wide>
-            <textarea rows="2" value={values.requiredMessage} onChange={(event) => onUpdate("requiredMessage", event.target.value)} placeholder="Any fact, CTA, claim limitation or client requirement" />
+          {values.tone === "Other" && (
+            <Field label="Describe tone">
+              <input value={values.customTone} onChange={(event) => onUpdate("customTone", event.target.value)} placeholder="e.g., Reassuring and practical" />
+            </Field>
+          )}
+          <Field label="Required message or approved claim (optional)" wide>
+            <textarea rows="2" value={values.requiredMessage} onChange={(event) => onUpdate("requiredMessage", event.target.value)} placeholder="Optional: approved fact, required CTA or claim limitation" />
           </Field>
         </div>
-        <button className="primary-button full" disabled={loading || !values.organization || !values.audience} onClick={onGenerate}>
+        <button className="primary-button full" disabled={loading || !values.organization || !values.audience || missingCustomValue} onClick={onGenerate}>
           {loading ? <Spinner /> : <Sparkles size={18} />}
           {loading ? "Preparing brief..." : "Generate editable brief"}
         </button>
@@ -553,7 +697,7 @@ function BriefStage({ values, onUpdate, briefText, onTextChange, onGenerate, onL
   );
 }
 
-function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOptions, selectedHook, onHookChange, onFeedback, onHooks, onLock, loading }) {
+function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOptions, selectedHook, hookTactic, onHookTactic, onSelectHook, onHookChange, onFeedback, onHooks, onLock, loading }) {
   const structure = ARC_STRUCTURES[arc];
   const hasDraft = structure.fields.every((field) => (drafts[field] || "").trim().length > 8);
   const isAligned = feedback?.alignment?.status === "Aligned";
@@ -640,24 +784,40 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
         )}
         {canDevelopHooks && (
           <section className="panel compact-panel hook-panel">
-            <PanelTitle icon={Sparkles} eyebrow="Hook workshop" title="Sharpen the opening" description="Choose or edit a hook grounded in your story." />
+            <PanelTitle icon={Sparkles} eyebrow="Hook workshop" title="Win the first 3 seconds" description="Stop the scroll, signal who this is for, and earn the next moment." />
+            <div className="hook-modes">
+              <span><b>Visual</b> See</span>
+              <span><b>Text</b> Read</span>
+              <span><b>Audio</b> Hear</span>
+            </div>
+            <Field label="Tactic">
+              <select value={hookTactic} onChange={(event) => onHookTactic(event.target.value)}>
+                {HOOK_TACTICS.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+              </select>
+            </Field>
+            <p className="hook-tactic-note">{HOOK_TACTICS.find((option) => option.id === hookTactic)?.description}</p>
             {!hookOptions.length ? (
               <button className="secondary-button full" onClick={onHooks} disabled={loading === "hooks"}>
                 {loading === "hooks" ? <Spinner /> : <Sparkles size={17} />}
-                Generate hook options
+                Create 3-second hooks
               </button>
             ) : (
               <>
                 <div className="hook-options">
                   {hookOptions.map((option) => (
-                    <button key={option.hook} className={selectedHook === option.hook ? "selected" : ""} onClick={() => onHookChange(option.hook)}>
+                    <button key={option.hook} className={selectedHook === option.hook ? "selected" : ""} onClick={() => onSelectHook(option)}>
+                      <small className="hook-label">{option.tactic} / {option.trigger}</small>
                       <b>{option.hook}</b>
-                      <small>{option.rationale}</small>
+                      <span><strong>Visual</strong>{option.visual}</span>
+                      <span><strong>Text</strong>{option.onScreenText}</span>
+                      <span><strong>Audio</strong>{option.audio}</span>
+                      <small>{option.whyItWorks}</small>
+                      {option.claimCheck && <small className="hook-check">{option.claimCheck}</small>}
                     </button>
                   ))}
                 </div>
-                <Field label="Edit your selected hook">
-                  <textarea rows="3" value={selectedHook} onChange={(event) => onHookChange(event.target.value)} />
+                <Field label="Edit selected hook line">
+                  <input value={selectedHook} onChange={(event) => onHookChange(event.target.value)} />
                 </Field>
                 <button className="primary-button full" disabled={!selectedHook.trim()} onClick={onLock}>
                   Approve story and hook <ArrowRight size={18} />
