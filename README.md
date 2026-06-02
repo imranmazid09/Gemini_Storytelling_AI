@@ -8,8 +8,8 @@ organization while retaining authorship of the final creative work.
 
 1. **Creative Brief**: choose organization-sensitive objectives and tone, add any optional approved claim, then generate and edit a strategy brief.
 2. **Story Studio**: draft an arc, receive campaign-aware Socratic feedback, and build a short visual/text/audio hook for the opening moment.
-3. **Content Studio**: generate and edit a static post, carousel, short video concept or paid ad.
-4. **Final Package**: prepare format-relevant execution directions, accessibility checks and an educator snapshot.
+3. **Content Studio**: choose a length, then generate and edit a static post, carousel, short video concept or paid ad. Still-image formats include generated visuals with editable hook text overlays.
+4. **Final Package**: prepare format-relevant execution directions, accessibility checks, an instructor evidence file and a Blackboard-ready ZIP containing the approved assets.
 
 AI feedback first checks whether the student's draft is strategically aligned with the locked
 brief, then separately checks whether it works as a connecting story through a focal character,
@@ -47,11 +47,14 @@ To test coaching locally, configure Netlify development environment variables fo
 ```txt
 GEMINI_API_KEY=your_server_side_gemini_api_key
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_IMAGE_MODEL=imagen-4.0-generate-001
 ```
 
 4. Deploy the site and verify a generated creative brief and coaching response.
 
 The API key is only read by the Netlify Function using `Netlify.env.get("GEMINI_API_KEY")`.
+`GEMINI_IMAGE_MODEL` supplies base still images for Static Post, Carousel and Paid Ad deliverables;
+the browser applies the student-approved text overlay exactly when exporting PNG assets.
 
 ## Source Direction
 

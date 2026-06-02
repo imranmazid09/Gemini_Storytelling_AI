@@ -1,7 +1,8 @@
 import type { Config, Context } from "@netlify/functions";
 import { GoogleGenAI } from "@google/genai";
 
-type Action = "brief" | "feedback" | "hooks" | "content" | "production";
+type TextAction = "brief" | "feedback" | "hooks" | "content" | "production";
+type Action = TextAction | "image";
 
 type CoachRequest = {
   action?: Action;
@@ -18,7 +19,7 @@ function cleanJson(text: string) {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
-function normalizeResult(action: Action, result: Record<string, unknown>) {
+function normalizeResult(action: TextAction, result: Record<string, unknown>, payload: Record<string, unknown>) {
   if (action === "hooks") {
     const options = Array.isArray(result.options) ? result.options : [];
     return {
@@ -37,6 +38,75 @@ function normalizeResult(action: Action, result: Record<string, unknown>) {
         };
       }),
     };
+  }
+
+  if (action === "content") {
+    const deliverable = String(payload.deliverable || "");
+    if (!["Static Post", "Carousel", "Paid Ad"].includes(deliverable)) {
+      return { ...result, visuals: [] };
+    }
+    const hookExecution = payload.hookExecution as Record<string, unknown> | undefined;
+    const overlayText = String(hookExecution?.onScreenText || payload.hook || result.headline || "");
+    const suppliedVisuals = Array.isArray(result.visuals) ? result.visuals : [];
+    const frames = Array.isArray(result.frames) ? result.frames : [];
+    const requestedCards = Number.parseInt(String(payload.length || "3"), 10);
+    const expectedCount = deliverable === "Carousel"
+      ? Math.min(Math.max(Number.isNaN(requestedCards) ? (suppliedVisuals.length || frames.length || 3) : requestedCards, 1), 10)
+      : 1;
+    const fallbackVisual = {
+      label: deliverable === "Carousel" ? "Card 1" : "Primary image",
+      prompt: String(result.visualDirection || hookExecution?.visual || "A respectful, platform-ready social image."),
+      overlayText,
+      altText: String(result.altText || ""),
+    };
+    const visualSource = Array.from({ length: expectedCount }, (_unused, index) => {
+      const frame = frames[index] as Record<string, unknown> | undefined;
+      return suppliedVisuals[index] || {
+        ...fallbackVisual,
+        label: deliverable === "Carousel" ? `Card ${index + 1}` : fallbackVisual.label,
+        prompt: String(frame?.visual || fallbackVisual.prompt),
+        overlayText: String(frame?.copy || (index === 0 ? overlayText : "")),
+      };
+    });
+    return {
+      ...result,
+      visuals: visualSource.map((item, index) => {
+        const visual = item as Record<string, unknown>;
+        return {
+          label: String(visual.label || (deliverable === "Carousel" ? `Card ${index + 1}` : "Primary image")),
+          prompt: String(visual.prompt || visual.visual || fallbackVisual.prompt),
+          overlayText: String(visual.overlayText || (index === 0 ? overlayText : "")),
+          altText: String(visual.altText || result.altText || ""),
+        };
+      }),
+    };
+  }
+
+  if (action === "production") {
+    const deliverable = String(payload.deliverable || "");
+    if (!["Static Post", "Carousel", "Paid Ad"].includes(deliverable)) {
+      return result;
+    }
+    const content = payload.content as Record<string, unknown> | undefined;
+    const rawScenes = Array.isArray(result.scenes) ? result.scenes : [];
+    const fallbackScene = {
+      stage: deliverable === "Carousel" ? "Card 1" : "Image + caption",
+      visual: String(content?.visualDirection || "Use the approved still image asset."),
+      onScreen: String(content?.headline || ""),
+    };
+    const stillScenes = (rawScenes.length ? rawScenes : [fallbackScene])
+      .slice(0, deliverable === "Carousel" ? undefined : 1)
+      .map((item, index) => {
+        const scene = item as Record<string, unknown>;
+        return {
+          stage: String(scene.stage || (deliverable === "Carousel" ? `Card ${index + 1}` : "Image + caption")),
+          time: deliverable === "Carousel" ? `Card ${index + 1}` : "Image 1",
+          visual: String(scene.visual || fallbackScene.visual),
+          audio: "Not applicable",
+          onScreen: String(scene.onScreen || fallbackScene.onScreen),
+        };
+      });
+    return { ...result, scenes: stillScenes };
   }
 
   if (action !== "feedback") {
@@ -73,7 +143,7 @@ function normalizeResult(action: Action, result: Record<string, unknown>) {
   return normalized;
 }
 
-function promptFor(action: Action, payload: Record<string, unknown>) {
+function promptFor(action: TextAction, payload: Record<string, unknown>) {
   const context = JSON.stringify(payload, null, 2);
   const shared = `You are StoryLab Pro, an attentive AdPR storytelling coach. Students create social media
 posts or ads for nonprofit or for-profit organizations. Help them make strategic content more human,
@@ -201,8 +271,19 @@ Return JSON shaped as:
         systemInstruction: `${shared}
 Translate the student's approved story and hook into platform-ready social content. Adapt the output to the
 selected static post, carousel, short video or paid ad. Preserve the selected hook execution's visual,
-text and audio logic where it fits the final format. For a paid ad, keep claims supportable and the CTA
-appropriate. Apply the campaign-mode standards rather than making every post sound like advocacy.`,
+text and audio logic where it fits the final format. Honor the requested length. Apply the campaign-mode
+standards rather than making every post sound like advocacy.
+
+Format requirements:
+- A Static Post is one still image with one concise on-image text overlay plus a caption, CTA and alt text.
+- A Carousel is a sequence of still-image cards matching the requested card count; include one image
+  direction and short overlay for each card.
+- A Paid Ad is one still image with on-image text, primary/caption text, headline and CTA. It is never a
+  video, moving scene, shot list or storyboard.
+- A Short Video may use scenes and audio; do not return still-image asset directions for it.
+For the first image, carry forward the approved hook workshop on-screen text exactly when it is provided.
+Describe images without requesting printed words, brand logos or watermarks; the app adds approved text
+overlays after image generation. Keep claims supportable and the CTA appropriate.`,
         prompt: `Create an editable social content draft.
 ${context}
 Return JSON shaped as:
@@ -213,15 +294,20 @@ Return JSON shaped as:
   "visualDirection": "respectful visual concept",
   "altText": "accessible alt text for the primary visual",
   "ethicalCheck": "one responsibility or claim check",
-  "frames": [{"title": "optional frame/card/beat title", "copy": "short copy", "visual": "direction"}]
+  "frames": [{"title": "optional frame/card/beat title", "copy": "short copy", "visual": "direction"}],
+  "visuals": [{"label": "Primary image or Card number; empty array only for Short Video", "prompt": "still-image direction without written text", "overlayText": "exact approved on-image wording", "altText": "asset alt text"}]
 }.`,
       };
     case "production":
       return {
         systemInstruction: `${shared}
-Create only the execution material needed for the selected deliverable. Static posts need a frame plan, not
-a video storyboard. Carousels need card sequencing. Videos need timed shots and caption guidance. Paid ads
-need execution directions and a clear claim/CTA review.`,
+Create only the execution material needed for the selected deliverable. Static posts need a single-image
+layout, not a video storyboard. Carousels need static card sequencing. Videos need timed shots and caption guidance.
+Paid ads are a still image plus caption/primary text, headline and CTA, with a clear claim/CTA review.
+Never give a Paid Ad video direction, motion direction, audio strategy, shot list or timed scene.
+For a Static Post or Paid Ad, return exactly one execution item with time "Image 1" and audio
+"Not applicable". For a Carousel, use "Card 1", "Card 2" and so on as the time values and audio
+"Not applicable". Only a Short Video may include timestamps and audio.`,
         prompt: `Turn the student's approved content into a final production package.
 ${context}
 Return JSON shaped as:
@@ -237,6 +323,44 @@ Return JSON shaped as:
   }
 }
 
+async function createImageAsset(ai: GoogleGenAI, payload: Record<string, unknown>) {
+  const direction = String(payload.prompt || "").trim();
+  if (!direction) {
+    return response({ error: "An image direction is required." }, 400);
+  }
+  const platform = String(payload.platform || "social media");
+  const deliverable = String(payload.deliverable || "still-image post");
+  const label = String(payload.label || "Primary image");
+  const overlayText = String(payload.overlayText || "").trim();
+  const imageModel = Netlify.env.get("GEMINI_IMAGE_MODEL") || "imagen-4.0-generate-001";
+  const prompt = `Create a polished square still image asset for a ${platform} ${deliverable}.
+Asset role: ${label}.
+Creative direction: ${direction}
+This is a respectful, realistic student campaign visual. Do not add words, typography, logos, UI,
+watermarks or caption boxes to the image. The application will add the approved overlay text separately:
+"${overlayText}".`;
+  const result = await ai.models.generateImages({
+    model: imageModel,
+    prompt,
+    config: {
+      numberOfImages: 1,
+      aspectRatio: "1:1",
+      outputMimeType: "image/png",
+      includeRaiReason: true,
+    },
+  });
+  const generated = result.generatedImages?.[0];
+  const data = generated?.image?.imageBytes;
+  if (!data) {
+    const reason = generated?.raiFilteredReason
+      ? ` Image safety review: ${generated.raiFilteredReason}.`
+      : "";
+    return response({ error: `No usable image was generated.${reason}` }, 422);
+  }
+  const mimeType = generated.image?.mimeType || "image/png";
+  return response({ dataUrl: `data:${mimeType};base64,${data}` });
+}
+
 export default async function coach(req: Request, _context: Context) {
   if (req.method !== "POST") {
     return response({ error: "Only POST requests are supported." }, 405);
@@ -249,7 +373,7 @@ export default async function coach(req: Request, _context: Context) {
     return response({ error: "Request body must be valid JSON." }, 400);
   }
 
-  if (!body.action || !["brief", "feedback", "hooks", "content", "production"].includes(body.action)) {
+  if (!body.action || !["brief", "feedback", "hooks", "content", "production", "image"].includes(body.action)) {
     return response({ error: "A valid coaching action is required." }, 400);
   }
 
@@ -264,11 +388,13 @@ export default async function coach(req: Request, _context: Context) {
     return response({ error: "The draft is too large for this coaching request." }, 413);
   }
 
-  const model = Netlify.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
-  const { systemInstruction, prompt } = promptFor(body.action, payload);
-
   try {
     const ai = new GoogleGenAI({ apiKey });
+    if (body.action === "image") {
+      return await createImageAsset(ai, payload);
+    }
+    const model = Netlify.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
+    const { systemInstruction, prompt } = promptFor(body.action, payload);
     const result = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -281,7 +407,7 @@ export default async function coach(req: Request, _context: Context) {
 
     const text = result.text || "";
     const parsed = JSON.parse(cleanJson(text)) as Record<string, unknown>;
-    return response(normalizeResult(body.action, parsed));
+    return response(normalizeResult(body.action, parsed, payload));
   } catch (error) {
     console.error("StoryLab Gemini request failed", error);
     return response({ error: "AI coaching is temporarily unavailable. Please try again." }, 502);

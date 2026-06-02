@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -8,6 +8,7 @@ import {
   Download,
   Film,
   HeartHandshake,
+  Image as ImageIcon,
   LayoutGrid,
   MessageSquareQuote,
   PenLine,
@@ -16,6 +17,7 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
+import { createZip, downloadBlob, renderVisualAsset } from "./packageDownload";
 
 const STAGES = [
   { id: 1, name: "Creative Brief", icon: Target },
@@ -43,11 +45,20 @@ const ARC_STRUCTURES = {
 };
 
 const DELIVERABLES = [
-  { id: "static", name: "Static Post", output: "Caption, visual direction, CTA and alt text" },
-  { id: "carousel", name: "Carousel", output: "Card sequence, caption and CTA" },
+  { id: "static", name: "Static Post", output: "Image with text overlay, caption, CTA and alt text" },
+  { id: "carousel", name: "Carousel", output: "Image cards with text overlays, caption and CTA" },
   { id: "video", name: "Short Video", output: "Script, scenes and captioning notes" },
-  { id: "paid", name: "Paid Ad", output: "Primary text, headline, CTA and claim check" },
+  { id: "paid", name: "Paid Ad", output: "Image with text overlay, caption, headline and CTA" },
 ];
+
+const IMAGE_DELIVERABLES = new Set(["static", "carousel", "paid"]);
+
+const CONTENT_LENGTH_OPTIONS = {
+  static: ["Concise caption (up to 50 words)", "Standard caption (up to 100 words)", "Extended caption (up to 150 words)", "Other"],
+  carousel: ["3 cards", "5 cards", "7 cards", "Other"],
+  video: ["15 seconds", "30 seconds", "60 seconds", "Other"],
+  paid: ["Concise ad copy (up to 50 words)", "Standard ad copy (up to 100 words)", "Extended ad copy (up to 150 words)", "Other"],
+};
 
 const ORGANIZATION_TYPES = [
   "Nonprofit",
@@ -120,7 +131,7 @@ const HOOK_TACTICS = [
   { id: "recommended", name: "Best fit", description: "Let the coach choose for this campaign." },
   { id: "confession", name: "Confession", description: "A candid mistake or changed belief." },
   { id: "bold-claim", name: "Bold claim", description: "A supportable statement to prove." },
-  { id: "relatability", name: "Relatability", description: "Specific language that signals this is for me." },
+  { id: "relatability", name: "Relatability", description: "Speak directly to a defined audience so the right person thinks, \"This is for me.\"" },
   { id: "contrast", name: "Contrast", description: "Old way versus a meaningful alternative." },
   { id: "curiosity", name: "Curiosity", description: "Open a truthful question worth staying for." },
 ];
@@ -156,6 +167,7 @@ const sampleBrief = {
 };
 
 function App() {
+  const studioRef = useRef(null);
   const [stage, setStage] = useState(1);
   const [briefInput, setBriefInput] = useState(initialBrief);
   const [briefText, setBriefText] = useState("");
@@ -169,13 +181,24 @@ function App() {
   const [hookTactic, setHookTactic] = useState("recommended");
   const [storyLocked, setStoryLocked] = useState(false);
   const [deliverable, setDeliverable] = useState("static");
+  const [contentLength, setContentLength] = useState(CONTENT_LENGTH_OPTIONS.static[0]);
+  const [customContentLength, setCustomContentLength] = useState("");
   const [content, setContent] = useState(null);
+  const [visualAssets, setVisualAssets] = useState([]);
   const [contentLocked, setContentLocked] = useState(false);
   const [production, setProduction] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
   const [exampleLoaded, setExampleLoaded] = useState(false);
+
+  useEffect(() => {
+    if (stage === 1) return undefined;
+    const scrollFrame = window.requestAnimationFrame(() => {
+      studioRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(scrollFrame);
+  }, [stage]);
 
   const arcText = useMemo(
     () =>
@@ -184,6 +207,8 @@ function App() {
         .join("\n"),
     [arc, arcDrafts],
   );
+  const selectedLength = contentLength === "Other" ? customContentLength.trim() : contentLength;
+  const requiresImages = IMAGE_DELIVERABLES.has(deliverable);
 
   const updateBrief = (field, value) => {
     setExampleLoaded(false);
@@ -239,7 +264,11 @@ function App() {
     setSelectedHookPlan(null);
     setHookTactic("recommended");
     setStoryLocked(false);
+    setDeliverable("static");
+    setContentLength(CONTENT_LENGTH_OPTIONS.static[0]);
+    setCustomContentLength("");
     setContent(null);
+    setVisualAssets([]);
     setContentLocked(false);
     setProduction(null);
     record("Brief locked", "Student reviewed and approved the editable brief");
@@ -294,8 +323,43 @@ function App() {
 
   const lockStory = () => {
     setStoryLocked(true);
+    setContent(null);
+    setVisualAssets([]);
+    setContentLocked(false);
+    setProduction(null);
     record("Story and hook locked", selectedHook);
     setStage(3);
+  };
+
+  const buildVisualAssets = async (draft, existingAssets = []) => {
+    if (!requiresImages) {
+      setVisualAssets([]);
+      return [];
+    }
+    const imageDirections = existingAssets.length ? existingAssets : draft.visuals || [];
+    if (!imageDirections.length) {
+      throw new Error("No image directions were returned. Generate a revised content draft.");
+    }
+    const pendingAssets = imageDirections.map((asset, index) => ({
+      ...asset,
+      id: asset.id || `asset-${index + 1}`,
+      src: "",
+    }));
+    setVisualAssets(pendingAssets);
+    const renderedAssets = await Promise.all(
+      pendingAssets.map(async (asset) => {
+        const result = await requestCoach("image", {
+          deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
+          platform: briefInput.platform,
+          label: asset.label,
+          prompt: asset.prompt,
+          overlayText: asset.overlayText,
+        });
+        return { ...asset, src: result.dataUrl };
+      }),
+    );
+    setVisualAssets(renderedAssets);
+    return renderedAssets;
   };
 
   const createContent = () =>
@@ -308,11 +372,32 @@ function App() {
         deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
         platform: briefInput.platform,
         placement: briefInput.placement,
+        length: selectedLength,
       });
       setContent(result);
+      setVisualAssets([]);
       setContentLocked(false);
+      setProduction(null);
+      if (requiresImages) {
+        const assets = await buildVisualAssets(result);
+        record("Image assets generated", `${assets.length} still image asset(s) with editable text overlay`);
+      }
       record("Social content generated", `${briefInput.platform} ${deliverable} draft`);
     });
+
+  const regenerateImages = () =>
+    run("images", async () => {
+      const assets = await buildVisualAssets(content, visualAssets);
+      record("Image assets refreshed", `${assets.length} still image asset(s) regenerated`);
+    });
+
+  const updateVisualAsset = (index, field, value) => {
+    setVisualAssets((previous) =>
+      previous.map((asset, assetIndex) => (assetIndex === index ? { ...asset, [field]: value } : asset)),
+    );
+    setContentLocked(false);
+    setProduction(null);
+  };
 
   const lockContent = () => {
     setContentLocked(true);
@@ -330,6 +415,8 @@ function App() {
         deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
         content,
         platform: briefInput.platform,
+        length: selectedLength,
+        visuals: visualAssets.map(({ src: _src, ...asset }) => asset),
       });
       setProduction(result);
       record("Final package created", "Production directions and educator summary generated");
@@ -349,7 +436,10 @@ function App() {
     setHookTactic("recommended");
     setStoryLocked(false);
     setDeliverable("static");
+    setContentLength(CONTENT_LENGTH_OPTIONS.static[0]);
+    setCustomContentLength("");
     setContent(null);
+    setVisualAssets([]);
     setContentLocked(false);
     setProduction(null);
     setHistory([]);
@@ -357,12 +447,19 @@ function App() {
     setError("");
   };
 
-  const downloadReport = () => {
+  const fileStem = (briefInput.organization || "storylab")
+    .trim()
+    .replace(/[^a-z0-9]+/gi, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase() || "storylab";
+
+  const educatorReport = () => {
     const lines = [
       "STORYLAB PRO - EDUCATOR SNAPSHOT",
       "",
       `Organization: ${briefInput.organization}`,
       `Deliverable: ${briefInput.platform} ${DELIVERABLES.find((item) => item.id === deliverable)?.name}`,
+      `Selected length: ${selectedLength}`,
       "",
       "CREATIVE BRIEF",
       lockedBrief,
@@ -381,6 +478,21 @@ function App() {
       content?.headline ? `Headline: ${content.headline}` : "",
       content?.cta ? `CTA: ${content.cta}` : "",
       "",
+      "APPROVED IMAGE ASSETS",
+      ...(visualAssets.length
+        ? visualAssets.flatMap((asset, index) => [
+            `Image ${index + 1}: ${asset.label || "Visual asset"}`,
+            `Text overlay: ${asset.overlayText || "None"}`,
+            `Image direction: ${asset.prompt || ""}`,
+            `Alt text: ${asset.altText || content?.altText || ""}`,
+            "",
+          ])
+        : ["No still-image assets for this format.", ""]),
+      "FINAL PRODUCTION PLAN",
+      ...(production?.scenes || []).map((scene) =>
+        `${scene.stage} (${scene.time}): ${scene.visual} | On-screen: ${scene.onScreen || "None"}`,
+      ),
+      "",
       "COACHING SNAPSHOT",
       feedback?.alignment ? `Brief alignment: ${feedback.alignment.status} - ${feedback.alignment.summary}` : "",
       feedback?.storyReadiness ? `Story connection: ${feedback.storyReadiness.status} - ${feedback.storyReadiness.summary}` : "",
@@ -397,14 +509,56 @@ function App() {
       content?.ethicalCheck || "",
       production?.accessibility || "",
     ];
-    const file = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${(briefInput.organization || "storylab").replaceAll(" ", "_")}_educator_snapshot.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    return lines.join("\n");
   };
+
+  const approvedCopyFile = () => [
+    "STORYLAB PRO - APPROVED CONTENT",
+    "",
+    `Format: ${briefInput.platform} ${DELIVERABLES.find((item) => item.id === deliverable)?.name}`,
+    `Length: ${selectedLength}`,
+    "",
+    "CAPTION / PRIMARY TEXT",
+    content?.primaryText || "",
+    "",
+    `Headline: ${content?.headline || ""}`,
+    `CTA: ${content?.cta || ""}`,
+    "",
+    ...visualAssets.flatMap((asset, index) => [
+      `Image ${index + 1} overlay: ${asset.overlayText || ""}`,
+      `Image ${index + 1} alt text: ${asset.altText || content?.altText || ""}`,
+    ]),
+  ].join("\n");
+
+  const downloadReport = () => {
+    const report = new Blob([educatorReport()], { type: "text/plain;charset=utf-8" });
+    downloadBlob(report, `${fileStem}_instructor_evidence.txt`);
+  };
+
+  const downloadSubmission = () =>
+    run("download", async () => {
+      const entries = [
+        {
+          name: `${fileStem}_instructor_evidence.txt`,
+          blob: new Blob([educatorReport()], { type: "text/plain;charset=utf-8" }),
+        },
+        {
+          name: `${fileStem}_approved_content.txt`,
+          blob: new Blob([approvedCopyFile()], { type: "text/plain;charset=utf-8" }),
+        },
+      ];
+      const imageEntries = await Promise.all(
+        visualAssets
+          .filter((asset) => asset.src)
+          .map(async (asset, index) => ({
+            name: `images/${fileStem}_image_${String(index + 1).padStart(2, "0")}.png`,
+            blob: await renderVisualAsset(asset),
+          })),
+      );
+      const packageFile = await createZip([...entries, ...imageEntries]);
+      downloadBlob(packageFile, `${fileStem}_blackboard_submission.zip`);
+      record("Submission downloaded", "ZIP package with approved assets and instructor evidence");
+    });
 
   const canVisit = (target) =>
     target === 1 ||
@@ -417,7 +571,7 @@ function App() {
       <Header onReset={resetProject} />
       <main>
         <Hero onStart={() => setStage(1)} onSample={fillSample} />
-        <section className="studio" id="studio">
+        <section className="studio" id="studio" ref={studioRef}>
           <div className="studio-heading">
             <div>
               <p className="eyebrow">Student Workspace</p>
@@ -481,16 +635,43 @@ function App() {
               deliverable={deliverable}
               onDeliverable={(nextDeliverable) => {
                 setDeliverable(nextDeliverable);
+                setContentLength(CONTENT_LENGTH_OPTIONS[nextDeliverable][0]);
+                setCustomContentLength("");
                 setContent(null);
+                setVisualAssets([]);
+                setContentLocked(false);
+                setProduction(null);
+              }}
+              contentLength={contentLength}
+              customContentLength={customContentLength}
+              onLength={(nextLength) => {
+                setContentLength(nextLength);
+                setCustomContentLength("");
+                setContent(null);
+                setVisualAssets([]);
+                setContentLocked(false);
+                setProduction(null);
+              }}
+              onCustomLength={(nextLength) => {
+                setCustomContentLength(nextLength);
+                setContent(null);
+                setVisualAssets([]);
                 setContentLocked(false);
                 setProduction(null);
               }}
               content={content}
-              onContent={setContent}
+              onContent={(nextContent) => {
+                setContent(nextContent);
+                setContentLocked(false);
+                setProduction(null);
+              }}
+              visualAssets={visualAssets}
+              onVisualAsset={updateVisualAsset}
               onGenerate={createContent}
+              onGenerateImages={regenerateImages}
               onLock={lockContent}
               platform={briefInput.platform}
-              loading={loading === "content"}
+              loading={loading}
             />
           )}
           {stage === 4 && (
@@ -501,9 +682,12 @@ function App() {
               platform={briefInput.platform}
               feedback={feedback}
               history={history}
+              visualAssets={visualAssets}
               onGenerate={createPackage}
               onDownload={downloadReport}
+              onDownloadSubmission={downloadSubmission}
               loading={loading === "production"}
+              downloading={loading === "download"}
             />
           )}
         </section>
@@ -795,7 +979,10 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
                 {HOOK_TACTICS.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </Field>
-            <p className="hook-tactic-note">{HOOK_TACTICS.find((option) => option.id === hookTactic)?.description}</p>
+            <div className="hook-tactic-note">
+              <b>Tactic guidance</b>
+              <span>{HOOK_TACTICS.find((option) => option.id === hookTactic)?.description}</span>
+            </div>
             {!hookOptions.length ? (
               <button className="secondary-button full" onClick={onHooks} disabled={loading === "hooks"}>
                 {loading === "hooks" ? <Spinner /> : <Sparkles size={17} />}
@@ -831,7 +1018,28 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
   );
 }
 
-function ContentStage({ deliverable, onDeliverable, content, onContent, onGenerate, onLock, platform, loading }) {
+function ContentStage({
+  deliverable,
+  onDeliverable,
+  contentLength,
+  customContentLength,
+  onLength,
+  onCustomLength,
+  content,
+  onContent,
+  visualAssets,
+  onVisualAsset,
+  onGenerate,
+  onGenerateImages,
+  onLock,
+  platform,
+  loading,
+}) {
+  const isImageFormat = IMAGE_DELIVERABLES.has(deliverable);
+  const lengthMissing = contentLength === "Other" && !customContentLength.trim();
+  const imageLoading = loading === "content" || loading === "images";
+  const imagesReady =
+    !isImageFormat || (visualAssets.length > 0 && visualAssets.every((asset) => Boolean(asset.src)));
   return (
     <div className="workspace-grid content-workspace">
       <section className="panel">
@@ -844,11 +1052,31 @@ function ContentStage({ deliverable, onDeliverable, content, onContent, onGenera
             </button>
           ))}
         </div>
-        <button className="primary-button full" onClick={onGenerate} disabled={loading}>
-          {loading ? <Spinner /> : <Sparkles size={18} />}
+        <div className="content-settings">
+          <Field label="Length">
+            <select value={contentLength} onChange={(event) => onLength(event.target.value)}>
+              {CONTENT_LENGTH_OPTIONS[deliverable].map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </Field>
+          {contentLength === "Other" && (
+            <Field label="Custom length">
+              <input
+                value={customContentLength}
+                onChange={(event) => onCustomLength(event.target.value)}
+                placeholder={deliverable === "carousel" ? "e.g., 4 cards" : "e.g., about 75 words"}
+              />
+            </Field>
+          )}
+        </div>
+        <button className="primary-button full" onClick={onGenerate} disabled={Boolean(loading) || lengthMissing}>
+          {loading === "content" ? <Spinner /> : <Sparkles size={18} />}
           {content ? "Generate revised content" : "Generate content draft"}
         </button>
-        <p className="micro-note">AI creates a starting draft. Students edit and approve the deliverable.</p>
+        <p className="micro-note">
+          {isImageFormat
+            ? "Still images are generated without embedded words; your approved text overlay is applied exactly in preview and download."
+            : "AI creates a starting draft. Students edit and approve the deliverable."}
+        </p>
       </section>
       <section className="panel output-panel">
         <PanelTitle icon={MessageSquareQuote} eyebrow="Editable deliverable" title={DELIVERABLES.find((item) => item.id === deliverable)?.name || "Content"} />
@@ -871,8 +1099,46 @@ function ContentStage({ deliverable, onDeliverable, content, onContent, onGenera
             <Field label="Accessibility alt text">
               <textarea rows="2" value={content.altText || ""} onChange={(event) => onContent({ ...content, altText: event.target.value })} />
             </Field>
+            {isImageFormat && (
+              <div className="visual-asset-editor">
+                <div className="visual-assets-heading">
+                  <div>
+                    <b>Generated image assets</b>
+                    <p>Edit the exact on-image text or the visual direction, then regenerate as needed.</p>
+                  </div>
+                  <button className="secondary-button compact" onClick={onGenerateImages} disabled={imageLoading}>
+                    {loading === "images" ? <Spinner /> : <ImageIcon size={16} />}
+                    Regenerate images
+                  </button>
+                </div>
+                <div className="visual-grid">
+                  {visualAssets.map((asset, index) => (
+                    <article className="visual-card" key={asset.id || index}>
+                      {asset.src ? (
+                        <div className="visual-preview">
+                          <img src={asset.src} alt={asset.altText || content.altText || ""} />
+                          {asset.overlayText && <span>{asset.overlayText}</span>}
+                        </div>
+                      ) : (
+                        <div className="visual-preview awaiting">
+                          {imageLoading && <Spinner />}
+                          <span>{imageLoading ? "Creating image..." : "Regenerate this image to preview it."}</span>
+                        </div>
+                      )}
+                      <h4>{asset.label || `Image ${index + 1}`}</h4>
+                      <Field label="Text overlay">
+                        <input value={asset.overlayText || ""} onChange={(event) => onVisualAsset(index, "overlayText", event.target.value)} />
+                      </Field>
+                      <Field label="Image direction">
+                        <textarea rows="3" value={asset.prompt || ""} onChange={(event) => onVisualAsset(index, "prompt", event.target.value)} />
+                      </Field>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            )}
             <FeedbackLine title="Responsible-use check" text={content.ethicalCheck} />
-            <button className="primary-button full" onClick={onLock}>
+            <button className="primary-button full" onClick={onLock} disabled={!imagesReady || imageLoading}>
               Approve content and build package <ArrowRight size={18} />
             </button>
           </div>
@@ -884,8 +1150,24 @@ function ContentStage({ deliverable, onDeliverable, content, onContent, onGenera
   );
 }
 
-function PackageStage({ content, production, deliverable, platform, feedback, history, onGenerate, onDownload, loading }) {
+function PackageStage({
+  content,
+  production,
+  deliverable,
+  platform,
+  feedback,
+  history,
+  visualAssets,
+  onGenerate,
+  onDownload,
+  onDownloadSubmission,
+  loading,
+  downloading,
+}) {
   const outputName = DELIVERABLES.find((item) => item.id === deliverable)?.name;
+  const isVideo = deliverable === "video";
+  const planTitle =
+    deliverable === "carousel" ? "Carousel image plan" : isVideo ? "Storyboard" : "Image + caption plan";
   return (
     <div className="package-layout">
       <section className="panel package-header">
@@ -900,9 +1182,15 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
             {production ? "Refresh package" : "Build package"}
           </button>
           {production && (
-            <button className="primary-button" onClick={onDownload}>
-              <Download size={17} /> Educator snapshot
-            </button>
+            <>
+              <button className="secondary-button" onClick={onDownload}>
+                <ClipboardCheck size={17} /> Instructor evidence file
+              </button>
+              <button className="primary-button" onClick={onDownloadSubmission} disabled={downloading}>
+                {downloading ? <Spinner /> : <Download size={17} />}
+                {downloading ? "Preparing ZIP..." : "Download all assets (.zip)"}
+              </button>
+            </>
           )}
         </div>
       </section>
@@ -916,7 +1204,7 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
               <div className="alt-box"><b>Alt text</b>{content?.altText}</div>
             </section>
             <section className="panel">
-              <PanelTitle icon={Film} eyebrow="Visual execution" title={deliverable === "video" ? "Storyboard" : "Frame plan"} />
+              <PanelTitle icon={isVideo ? Film : ImageIcon} eyebrow={isVideo ? "Visual execution" : "Still-image execution"} title={planTitle} />
               <div className="scene-list">
                 {(production.scenes || []).map((scene, index) => (
                   <article key={`${scene.stage}-${index}`}>
@@ -929,6 +1217,22 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
               </div>
             </section>
           </div>
+          {visualAssets.length > 0 && (
+            <section className="panel package-assets">
+              <PanelTitle icon={ImageIcon} eyebrow="Downloadable creative" title="Approved images with text overlays" />
+              <div className="package-asset-grid">
+                {visualAssets.filter((asset) => asset.src).map((asset, index) => (
+                  <article key={asset.id || index}>
+                    <div className="visual-preview">
+                      <img src={asset.src} alt={asset.altText || content?.altText || ""} />
+                      {asset.overlayText && <span>{asset.overlayText}</span>}
+                    </div>
+                    <b>{asset.label || `Image ${index + 1}`}</b>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="production-grid lower">
             <section className="panel">
               <PanelTitle icon={ShieldCheck} eyebrow="Final check" title="Accessibility and responsibility" />
@@ -953,9 +1257,13 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
         </>
       ) : (
         <section className="panel package-empty">
-          <Film size={30} />
+          {isVideo ? <Film size={30} /> : <ImageIcon size={30} />}
           <h3>Your approved content is ready for execution.</h3>
-          <p>Build only the frame plan, accessibility guidance and learning record needed for this deliverable.</p>
+          <p>
+            {isVideo
+              ? "Build the storyboard, accessibility guidance and learning record needed for this deliverable."
+              : "Build the still-image plan, caption package, accessibility guidance and learning record needed for this deliverable."}
+          </p>
         </section>
       )}
     </div>
