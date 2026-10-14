@@ -1326,3 +1326,24 @@ main {
     padding-right: 18px;
   }
 }
+
+/* Focused brief review, learning record and verification additions. */
+.workspace-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
+.brief-workspace { display: grid; gap: 24px; }
+.brief-workspace .workspace-grid { align-items: stretch; }
+.read-check { display: flex; align-items: center; gap: 16px; margin: 24px 0 16px; }
+.read-check input { width: 24px; height: 24px; }
+.locked-brief { margin: 24px 0; }
+.locked-brief summary { cursor: pointer; font-weight: 700; padding: 16px 0; }
+.locked-brief pre, .verification-page pre { white-space: pre-wrap; font: inherit; overflow-wrap: anywhere; }
+.frame-editor { border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: grid; gap: 16px; }
+.endorsement { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.verification-page { max-width: 900px; padding: 24px; margin: 24px auto; }
+.verification-page .panel { display: grid; gap: 24px; }
+.verification-page h1 { font-size: 36px; }
+.verification-page code { overflow-wrap: anywhere; }
+.error-banner .secondary-button { margin: 8px; }
+.primary-button { background: #1865f2; border-color: #1865f2; color: white; }
+.primary-button:hover:not(:disabled) { background: #1b50b3; border-color: #1b50b3; }
+:focus-visible { outline: 3px solid #1865f2; outline-offset: 3px; }
+@media (max-width: 700px) { .package-actions { flex-wrap: wrap; } .package-actions button { width: 100%; } }

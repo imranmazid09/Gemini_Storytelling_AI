@@ -1,9 +1,13 @@
 import type { Config, Context } from "@netlify/functions";
 import { GoogleGenAI } from "@google/genai";
+import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
+import { removeDuplicateSections } from "../../shared/response.mjs";
+import { hash, token, records, validSession } from "../lib/records.mts";
 
 type Action = "brief" | "feedback" | "hooks" | "content" | "production";
 
 type CoachRequest = {
+  session?: string;
   action?: Action;
   payload?: Record<string, unknown>;
 };
@@ -11,72 +15,35 @@ type CoachRequest = {
 const jsonHeaders = { "Content-Type": "application/json" };
 
 function response(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+  return new Response(JSON.stringify(body), { status, headers: { ...jsonHeaders, "Cache-Control": "no-store" } });
 }
 
 function cleanJson(text: string) {
   return text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
 }
 
-function normalizeResult(action: Action, result: Record<string, unknown>) {
-  if (action === "hooks") {
-    const options = Array.isArray(result.options) ? result.options : [];
-    return {
-      ...result,
-      options: options.map((item) => {
-        const option = item as Record<string, unknown>;
-        return {
-          tactic: String(option.tactic || "Best fit"),
-          trigger: String(option.trigger || "Pattern interrupt"),
-          hook: String(option.hook || ""),
-          visual: String(option.visual || "Show the central moment immediately."),
-          onScreenText: String(option.onScreenText || option.hook || ""),
-          audio: String(option.audio || "Use audio only when the format supports it."),
-          whyItWorks: String(option.whyItWorks || option.rationale || ""),
-          claimCheck: String(option.claimCheck || ""),
-        };
-      }),
-    };
-  }
-
-  if (action !== "feedback") {
-    return result;
-  }
-
-  const normalized = { ...result };
-  const alignment = result.alignment as Record<string, unknown> | undefined;
-  const validStatuses = ["Aligned", "Needs connection", "Off brief"];
-  if (!alignment || !validStatuses.includes(String(alignment.status))) {
-    normalized.alignment = {
-      status: "Needs connection",
-      summary: "The coach could not confirm that this story serves the locked brief yet.",
-      missingLink: "Revise the draft to show how its central human moment supports the organization and objective.",
-    };
-  }
-
-  const normalizedAlignment = normalized.alignment as Record<string, unknown>;
-  const readiness = result.storyReadiness as Record<string, unknown> | undefined;
-  const validReadiness = ["Ready for hooks", "Revise first"];
-  if (!readiness || !validReadiness.includes(String(readiness.status))) {
-    normalized.storyReadiness = {
-      status: "Revise first",
-      summary: "The story needs a visible focal person, pressure and meaningful change before hook development.",
-      priority: "Center one ethical, specific viewpoint and show what changes for that person.",
-    };
-  } else if (normalizedAlignment.status !== "Aligned") {
-    normalized.storyReadiness = {
-      ...readiness,
-      status: "Revise first",
-    };
-  }
-
-  return normalized;
+function validateResult(action: Action, result: Record<string, any>, payload: Record<string, unknown>) {
+  const text = (value: unknown) => typeof value === "string" && Boolean(value.trim());
+  const fields = (object: any, keys: string[]) => object && keys.every(key => text(object[key]));
+  if (action === "brief") return text(result.id) && missingBrief(result).length === 0 && result.aiGenerated === true &&
+    ['Instagram static post', 'Instagram carousel', 'Short video', 'Paid ad'].includes(result.deliverable) && result.reasonToBelieve.startsWith('Supplied fictional scenario facts:') &&
+    result.client.toLowerCase() !== String(payload.previousClient || "").toLowerCase() &&
+    !Object.keys(BRIEF_FIELDS).some(key => /^(tbd|n\/a)$/i.test(String(key.includes('.') ? result.thinkFeelDo?.[key.split('.')[1]] : result[key]).trim()));
+  if (action === "feedback") return fields(result.alignment, ['status', 'summary']) &&
+    ['Aligned', 'Needs connection', 'Off brief'].includes(result.alignment.status) &&
+    fields(result.storyReadiness, ['status', 'summary']) && ['Ready for hooks', 'Revise first'].includes(result.storyReadiness.status) &&
+    fields(result, ['connection', 'responsibility']) && Array.isArray(result.beats) && result.beats.length > 0 && result.beats.every((beat: any) => fields(beat, ['stage', 'sharpen'])) &&
+    Array.isArray(result.questions) && result.questions.length > 0 && result.questions.every(text) &&
+    Array.isArray(result.rubric) && result.rubric.length > 0 && result.rubric.every((entry: any) => fields(entry, ['label', 'level']));
+  if (action === "hooks") return Array.isArray(result.options) && result.options.length > 0 && result.options.every((option: any) => fields(option, ['tactic', 'trigger', 'hook', 'visual', 'onScreenText', 'audio', 'whyItWorks', 'claimCheck']) && option.hook.trim().split(/\s+/).length <= 12 && option.onScreenText.trim().split(/\s+/).length <= 8);
+  if (action === "content") return missingContent(result, String(payload.deliverable).includes('Video') ? 'video' : String(payload.deliverable) === 'Carousel' ? 'carousel' : 'static').length === 0;
+  return fields(result, ['summary', 'accessibility', 'educatorSummary']) && Array.isArray(result.scenes) && result.scenes.length > 0 && result.scenes.every((scene: any) => fields(scene, ['stage', 'time', 'visual', 'audio', 'onScreen']));
 }
 
 function promptFor(action: Action, payload: Record<string, unknown>) {
   const context = JSON.stringify(payload, null, 2);
   const shared = `You are StoryLab Pro, an attentive AdPR storytelling coach. Students create social media
-posts or ads for nonprofit or for-profit organizations. Help them make strategic content more human,
+posts or ads for fictional nonprofit or for-profit classroom clients. This is advertising storytelling training: connect an audience tension to a credible brand role, one message and an actionable CTA. Help them make strategic content more human,
 specific, persuasive and respectful. Do not pressure disclosure, invent client claims, exploit hardship,
 or replace student authorship.
 
@@ -88,6 +55,7 @@ Identify the campaign mode before coaching:
 - Advocacy or public-policy: center stakeholder or self-advocate leadership, identify a systemic barrier
   and a responsible civic action; never fictionalize lived experience or make hardship spectacle.
 - Public-service communication: prioritize clarity, trust, behavioral usefulness and equitable framing.
+All brief facts are fictional classroom scenario facts, not verified real-world evidence. Do not present them as researched facts. Preserve the locked brief's mandatory details and constraints in every output. Do not add superiority claims, guarantees, fabricated testimony or unsupported outcomes. Do not infer engagement or learning quality from button clicks.
 A nonprofit can run advocacy and a brand can support a cause. Infer the mode from the objective and brief;
 do not impose advocacy standards on ordinary brand work. Return only valid JSON.`;
 
@@ -95,13 +63,10 @@ do not impose advocacy standards on ordinary brand work. Return only valid JSON.
     case "brief":
       return {
         systemInstruction: `${shared}
-Create an editable creative strategy brief between 120 and 180 words. Keep the student's stated facts and
-make an unverified claim explicit as a constraint rather than presenting it as true. Resolve an "Other"
-organization, objective or tone through its accompanying custom text. Tailor strategy and CTA standards to
-the campaign mode rather than treating brands, nonprofits and advocacy campaigns as interchangeable.`,
-        prompt: `Using these assignment inputs, write the brief.
-${context}
-Return JSON in this shape: { "brief": "editable brief text" }.`,
+Invent a fictional client with a different name from previousClient. Prefer an industry other than Food and Beverage, Retail, Technology, Local Services, Entertainment or Nonprofit. Fill every field; no empty fields or TBD. Use plain language readable in under two minutes. singleMessage is one single-minded plain-language advertising message. mandatory names a concrete place, date or action. reasonToBelieve must begin "Supplied fictional scenario facts:". Include only modest concrete scenario facts; no statistics, performance promises, superlatives or unverified comparisons. constraints explicitly name prohibited claims and creative choices. deliverable must be exactly Instagram static post, Instagram carousel, Short video or Paid ad. cardIndustry and cardObjective are short menu labels.`,
+        prompt: `Create one complete fictional advertising brief. ${context}
+Return only this JSON shape with every string filled:
+{"id":"unique fictional client slug","cardIndustry":"industry","cardObjective":"campaign type","client":"fictional client name","background":"context","audience":"specific audience","objective":"advertising objective","singleMessage":"one message","reasonToBelieve":"Supplied fictional scenario facts: ...","thinkFeelDo":{"think":"thought","feel":"feeling","do":"action"},"tone":"tone","mandatory":"concrete required detail","constraints":"what is off limits","deliverable":"Instagram static post","aiGenerated":true}`,
       };
     case "feedback":
       return {
@@ -202,7 +167,8 @@ Return JSON shaped as:
 Translate the student's approved story and hook into platform-ready social content. Adapt the output to the
 selected static post, carousel, short video or paid ad. Preserve the selected hook execution's visual,
 text and audio logic where it fits the final format. For a paid ad, keep claims supportable and the CTA
-appropriate. Apply the campaign-mode standards rather than making every post sound like advocacy.`,
+appropriate. Apply the campaign-mode standards rather than making every post sound like advocacy.
+Make the copy ready to place in a design or editing tool. Provide exact text and concrete visual directions, no placeholders. Carousel frames contain a finished card headline and body in copy. Short video frames contain finished spoken lines or captions in copy, with visual shot instructions. A static post or paid ad has one frame. Preserve approved facts without embellishment. Include the locked mandatory detail and CTA. Do not invent student rationale.`,
         prompt: `Create an editable social content draft.
 ${context}
 Return JSON shaped as:
@@ -221,7 +187,8 @@ Return JSON shaped as:
         systemInstruction: `${shared}
 Create only the execution material needed for the selected deliverable. Static posts need a frame plan, not
 a video storyboard. Carousels need card sequencing. Videos need timed shots and caption guidance. Paid ads
-need execution directions and a clear claim/CTA review.`,
+need execution directions and a clear claim/CTA review.
+This is an executable handoff: each scene has exact on-screen copy, shot/card composition, and actual voiceover or sound cues. Videos use explicit time ranges totaling a feasible short video; carousels use card numbers; static and paid ads use one frame. Use "Not applicable — static format" for audio only in static formats. Reuse approved content.frames and copy; do not rewrite approved claims, add new facts or invent missing decisions. Accessibility must give usable alt text or caption instructions. educatorSummary describes this production package only; never invent student revision, effort or learning.`,
         prompt: `Turn the student's approved content into a final production package.
 ${context}
 Return JSON shaped as:
@@ -237,7 +204,7 @@ Return JSON shaped as:
   }
 }
 
-export default async function coach(req: Request, _context: Context) {
+export default async function coach(req: Request, context: Context) {
   if (req.method !== "POST") {
     return response({ error: "Only POST requests are supported." }, 405);
   }
@@ -264,26 +231,47 @@ export default async function coach(req: Request, _context: Context) {
     return response({ error: "The draft is too large for this coaching request." }, 413);
   }
 
+  if (body.action === 'hooks') {
+    const feedback = payload.feedback as any;
+    if (feedback?.alignment?.status !== 'Aligned' || feedback?.storyReadiness?.status !== 'Ready for hooks') return response({ error: 'Revise your story and request feedback before developing hooks.' }, 400);
+  }
   const model = Netlify.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
   const { systemInstruction, prompt } = promptFor(body.action, payload);
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const result = await ai.models.generateContent({
-      model,
-      contents: prompt,
-      config: {
-        systemInstruction,
-        temperature: body.action === "feedback" ? 0.2 : 0.6,
-        responseMimeType: "application/json",
-      },
-    });
-
-    const text = result.text || "";
-    const parsed = JSON.parse(cleanJson(text)) as Record<string, unknown>;
-    return response(normalizeResult(body.action, parsed));
+    let output: Record<string, any> | undefined;
+    let cleanup = 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await ai.models.generateContent({
+        model,
+        contents: prompt + (attempt ? "\nThe previous response was invalid or repeated a labeled section. Return complete, clean JSON with no duplicate blocks." : ""),
+        config: { systemInstruction, temperature: body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json" },
+      });
+      let parsed;
+      try { parsed = JSON.parse(cleanJson(result.text || "")); } catch { if (!attempt) continue; throw new Error('Invalid JSON'); }
+      const deduped = removeDuplicateSections(parsed);
+      if (deduped.removed && !attempt) continue;
+      if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) continue; throw new Error('Incomplete AI response'); }
+      output = deduped.result;
+      cleanup = deduped.removed;
+      break;
+    }
+    if (!output) throw new Error('No complete AI response');
+    if (body.action === 'feedback' && output.alignment.status !== 'Aligned') output.storyReadiness.status = 'Revise first';
+    // Store hashes and timestamps only, never student prose or API credentials.
+    let receipt;
+    let receiptWarning;
+    try {
+      const store = records(context.deploy.context);
+      if (await validSession(store, body.session)) {
+        receipt = token();
+        await store.setJSON(`calls/${receipt}`, { sessionHash: hash(body.session!), action: body.action, at: new Date().toISOString(), inputHash: hash(JSON.stringify(payload)), outputHash: hash(JSON.stringify(output)) }, { onlyIfNew: true });
+      } else receiptWarning = 'This AI call has no verified session receipt.';
+    } catch { receiptWarning = 'AI completed, but server verification could not record this call.'; }
+    return response({ ...output, _cleanup: cleanup, _receipt: receipt, _receiptWarning: receiptWarning });
   } catch (error) {
-    console.error("StoryLab Gemini request failed", error);
+    console.error("StoryLab Gemini request failed", error instanceof Error ? error.name : "error");
     return response({ error: "AI coaching is temporarily unavailable. Please try again." }, 502);
   }
 }

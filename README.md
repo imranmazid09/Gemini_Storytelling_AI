@@ -58,3 +58,50 @@ The API key is only read by the Netlify Function using `Netlify.env.get("GEMINI_
 This application replaces the earlier multi-section AI Storytelling Lab with the StoryLab Pro
 approach developed for AdPR coursework: strategy, story, focused revision, social execution and
 lightweight educator evidence.
+
+## Briefs and student learning records
+
+Step 1 offers a six-client dropdown and one-click fictional AI briefs. Instructor data is versioned in
+`src/prebuilt-creative-briefs.json`. Every scenario is fictional; its evidence is supplied for classroom
+practice rather than verified real-world advertising claims. The locked structured brief feeds all later
+coaching. The student still writes the story and approves creative decisions.
+
+Project state, retained AI drafts and before/after edits autosave in this browser. Clearing browser storage
+removes local work. A persistent banner reports storage failure; a local document can be downloaded at
+any stage. Starting a new project requires confirmation.
+
+At completion, download a plain-text production handoff or a self-contained HTML learning record.
+Open the HTML to review, share, or print/save as PDF. It contains copy, frames/cards, audio directions,
+accessibility instructions, UTC timestamps, edit evidence, approvals and optional student reflection.
+Actions are described rather than scored; unchanged AI acceptance is explicit.
+
+### Instructor QR verification
+
+`/api/record` creates an opaque session and registers immutable report receipts in Netlify Blobs.
+`/api/coach` records only successful-call input/output hashes and server timestamps. Stores are scoped
+by deploy context (`storylab-receipts-production`, `storylab-receipts-deploy-preview`, etc.). No extra
+API credential is needed on Netlify: Blobs receives its credentials from the Functions runtime.
+Creative drafts and names are not stored server-side by this feature. Record hashes and receipt
+metadata are accessible to anyone with the random verification link.
+
+The report QR opens `/verify/<receipt-id>`. The instructor can select the original HTML document
+locally to check its embedded record digest and retained AI drafts. The file is not uploaded.
+A matching receipt verifies tool issuance and the listed successful AI calls. Browser edits and
+client timestamps remain self-reported, and the receipt does not authenticate student identity,
+prove authorship or grade learning. Printed/PDF versions retain the QR but require the original
+HTML for the embedded-record integrity check. Keep the published verification origin available.
+
+If Blobs is unavailable, AI coaching still works and students can download an explicitly unverified
+local record. Calls without stored receipts cannot later acquire server confirmation.
+
+See `docs/step1-and-learning-record-plan.md` for the accepted scope and evidence definitions.
+
+## Validation
+
+`npm test` runs deterministic function, duplicate-cleanup, schema and evidence tests with isolated
+in-memory storage and a mocked Gemini SDK. `npm run test:browser` uses Playwright with controlled
+API responses, testing selection, validation, reload recovery, errors/retry, edit evidence,
+downloads, QR digest checking and autosave failure. Install Playwright locally to use that command;
+`PLAYWRIGHT_MODULE` and `CHROME_PATH` can point to existing tooling. These tests do not consume AI
+credits. `npm run check` checks the production build. Live Gemini behavior still needs a preview
+smoke test after deploying with the existing server-side environment variables.
