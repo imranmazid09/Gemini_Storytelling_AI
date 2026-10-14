@@ -155,7 +155,7 @@ function App() {
     if (!selectedHook.trim() || !feedback || feedback.alignment.status !== 'Aligned' || feedback.storyReadiness.status !== 'Ready for hooks') return;
     const original = hookOptions.find(option => option.visual === selectedHookPlan?.visual && option.onScreenText === selectedHookPlan?.onScreenText);
     const unchanged = original?.hook === selectedHook;
-    update(previous => addEvent({ ...previous, storyLocked: true, stage: 3 }, 'Story and hook approved', `Student-authored story; AI hook ${unchanged ? 'accepted unchanged' : 'edited before approval'}.`, { unchanged }));
+    update(previous => addEvent({ ...previous, storyLocked: true, stage: 3 }, 'Story and hook approved', `Story entered in the workspace; AI hook ${unchanged ? 'accepted unchanged' : 'edited before approval'}.`, { unchanged }));
   };
   const createContent = () => {
     if (content && !window.confirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
