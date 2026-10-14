@@ -22,5 +22,7 @@ for (let i=0;i<briefs.length;i++) {
 assert(hookIssues({options:[{tactic:'Question',hook:'A?'},{tactic:'Scene',hook:'B.'},{tactic:'Number',hook:'1.'}]}, { story: '1 approved hour' }).length===0);
 assert(hookIssues({options:[{tactic:'Question',hook:'A?'},{tactic:'Question',hook:'B?'},{tactic:'Question',hook:'C?'}]}).some(issue=>issue.includes('different')));
 assert(hookIssues({options:[{tactic:'Question',hook:'a'.repeat(81)},{tactic:'Scene',hook:'B.'},{tactic:'Number',hook:'1.'}]}).some(issue=>issue.includes('80')));
-assert.equal(COPY_ENGINE_VERSION,'1.0.0');
+assert.match(COPY_ENGINE_VERSION,/^\d+\.\d+\.\d+$/);
+const punctuationCopy = { primaryText: 'Cracked screen.\n\n48 West Fulton, weekdays 9 to 6.\nStop by for a screen assessment.', headline: 'Screen assessments near campus', cta: 'Stop by for a screen assessment', frames: [] };
+assert(!copyIssues(punctuationCopy,{briefFields:briefs[3],hook:'Cracked screen.',story:'A student requests an assessment.',deliverable:'Static Post'}).some(issue=>issue.includes('End the caption')));
 console.log('PASS: all six classroom briefs, verbatim hook, mandatory detail, unapproved numbers, banned language and distinct hook types.');

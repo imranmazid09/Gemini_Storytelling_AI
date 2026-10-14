@@ -6,7 +6,7 @@ const numberText = text => String(text || '').replace(/\b(one|two|three|four|fiv
 const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 export function briefFields(payload) {
   if (payload.briefFields && typeof payload.briefFields === 'object') return payload.briefFields;
-  const labels = { client: 'Fictional client', audience: 'Audience', singleMessage: 'Single message', tone: 'Tone', reasonToBelieve: 'Reason to believe / supplied scenario facts', mandatory: 'Mandatory detail', constraints: 'Constraints' };
+  const labels = { client: 'Fictional client', objective: 'Advertising objective', audience: 'Audience', singleMessage: 'Single message', tone: 'Tone', reasonToBelieve: 'Reason to believe / supplied scenario facts', mandatory: 'Mandatory detail', constraints: 'Constraints' };
   return Object.fromEntries(Object.entries(labels).map(([key, label]) => [key, String(payload.brief || '').split('\n').find(line => line.startsWith(label + ':'))?.slice(label.length + 1).trim() || '']));
 }
 export function copyTask(payload) {
@@ -39,7 +39,8 @@ export function copyIssues(result, payload) {
   if (/\bfrom\s+\S+(?:\s+\S+){0,3}\s+to\b/i.test(creative)) issues.push('Avoid generic from-X-to-Y framing.');
   const cta = String(result.cta || '').trim();
   if (!cta || /^learn more\b/i.test(cta)) issues.push('Use one specific call to action.');
-  if (cta && normalize(lines.filter(line => line.trim()).at(-1)) !== normalize(cta)) issues.push('End the caption with the CTA, with no extra requests.');
+  if (cta && /^link in bio|^tickets? in bio/i.test(cta)) issues.push('Name the specific action that serves the objective, not only the link location.');
+  if (cta && normalize(lines.filter(line => line.trim()).at(-1)).replace(/[.!?]+$/, '') !== normalize(cta).replace(/[.!?]+$/, '')) issues.push('End the caption with the CTA, with no extra requests.');
   if (cta && normalize(caption).split(normalize(cta)).length - 1 > 1) issues.push('Do not repeat the CTA within the caption.');
   if (caption.split(/\n\s*\n/).some(paragraph => paragraph.trim().split('\n').length > 2)) issues.push('Use blocks of no more than two written lines, separated by blank lines.');
   const brief = briefFields(payload);

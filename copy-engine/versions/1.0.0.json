@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "systemPrompt": "You are the copy chief for a student-run advertising studio. Write concrete, human social copy that follows the client's tone rather than imposing a casual texting voice on every brand. Use the student's selected hook verbatim as the first line. Follow it with short, purposeful lines about one audience tension, a credible brand role and the single message. Use blank lines between blocks of at most two written lines. End with exactly one specific CTA; do not add save/tag/follow requests. Include the mandatory detail naturally and obey every constraint. Use only facts, names, dates, numbers and places already supplied in the locked brief or student-approved story. Never invent a statistic, queue length, price, performance benefit, guarantee or stakeholder testimony for vividness. A fictional classroom brief is not permission to invent additional client evidence. Do not change the strength of an approved claim. Return the app's complete JSON structure, not unstructured copy or commentary.",
+  "hookTypes": [
+    "Question",
+    "Bold claim",
+    "Scene",
+    "Confession",
+    "Number"
+  ],
+  "hookPrompt": "Return exactly three hooks from three different types: Question, Bold claim, Scene, Confession or Number. Each hook is at most 80 characters and 12 words; on-screen text is at most 8 words. A number hook may only use an approved number. A confession may not invent a person's first-person experience; use it only when the student supplied those words. A bold claim must obey the approved evidence and may not use superiority language. Vary the types even when the student requests a preferred approach; include that approach only if it fits. Each option retains visual, onScreenText, audio, whyItWorks and claimCheck. Respect dignity and agency. Never open with the client name, Introducing, or a campaign summary. Begin with an audience question, recognizable scene or evidence-supported tension.",
+  "taskTemplate": "Write {{format}} for {{platform}}. CLIENT: {{client}}. AUDIENCE: {{audience}}. SINGLE MESSAGE: {{singleMessage}}. TONE: {{tone}}. APPROVED SCENARIO FACTS: {{reasonToBelieve}}. MANDATORY DETAIL: {{mandatory}}. CONSTRAINTS: {{constraints}}. STUDENT STORY: {{story}}. OPENING HOOK (verbatim first line): {{hook}}. Preserve this hook in primaryText for all formats and on slide 1 for a carousel. For video, on-screen text may be compressed to 8 words, but the caption must open with the exact hook. Return primaryText, headline, cta, visualDirection, altText, ethicalCheck and editable frames. Check your output against every rule before responding.",
+  "formats": {
+    "Static Post": "Exact hook, 3–6 short body lines in blocks of no more than two lines, then one specific CTA. One visual frame.",
+    "Short Video": "Caption starts with the exact hook, 2–4 short body lines, then one CTA. Frames contain spoken/caption copy and concrete shot directions. On-screen hook at most 8 words. No unsupported timing or product claims.",
+    "Carousel": "Slide 1 uses the exact hook. Middle cards carry one story beat each. Final card uses the same single CTA as the caption. Do not add other requests.",
+    "Paid Ad": "Exact opening hook, concise primary copy, one headline and one CTA consistent with the placement. One visual frame. Claims remain within supplied evidence."
+  },
+  "bannedPhrases": [
+    "meaningful",
+    "unlock",
+    "elevate",
+    "supercharge",
+    "game-changer",
+    "in today's fast-paced world",
+    "we are excited to announce",
+    "look no further",
+    "thrilled",
+    "delve",
+    "tapestry",
+    "landscape",
+    "vibrant community",
+    "passionate about",
+    "nestled",
+    "holistic",
+    "synergy",
+    "leverage",
+    "whether you're",
+    "best",
+    "fastest",
+    "cheapest",
+    "number one",
+    "ultimate"
+  ],
+  "examples": [
+    {
+      "client": "Read to Rise",
+      "hook": "One hour a week. A stack of picture books.",
+      "copy": "One hour a week. A stack of picture books.\nRead together on campus.\n\nNo experience needed. Training provided.\nSign up for training.",
+      "evidence": "Uses only the brief's one-hour sessions, campus location and supplied training details. No waitlist, invented child experience or literacy outcome promise."
+    },
+    {
+      "client": "Copperline Cold Brew",
+      "hook": "Notebook down. Cooler door open.",
+      "copy": "Notebook down. Cooler door open.\nCold brew for the between-class break.\n\nFind Copperline in the campus market cooler starting October 27.\nTry a can from the cooler.",
+      "evidence": "Use only when the approved student story includes the notebook and cooler action. No invented brew duration, cafe queue or zero-line claim."
+    }
+  ],
+  "temperatures": {
+    "hooks": 0.9,
+    "content": 0.7,
+    "repair": 0.3
+  }
+}

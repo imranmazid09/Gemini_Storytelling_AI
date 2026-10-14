@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
+import { COPY_ENGINE_VERSION } from '../shared/copy.mjs';
 import { missingBrief, missingContent } from '../shared/brief.mjs';
 import { removeDuplicateSections, similarity } from '../shared/response.mjs';
 import { learningSummary, addEvent, freshProject, edit } from '../src/project.js';
@@ -50,7 +51,7 @@ const copyPayload = { briefFields: briefSet.briefs[0], hook: 'Notebook down. Coo
 const cleanCopy = { primaryText: 'Notebook down. Cooler door open.\nCold brew for the between-class break.\n\nFind Copperline in the campus market cooler starting October 27.\nTry a can from the cooler.', headline: 'Cold brew for the between-class break.', cta: 'Try a can from the cooler.', visualDirection: 'Notebook beside the can.', altText: 'Notebook and cold brew can.', ethicalCheck: 'Supplied fictional facts only.', frames: [{ title: 'Frame', copy: 'Notebook down. Cooler door open.', visual: 'Notebook and can.' }] };
 __responses.push({ ...cleanCopy, headline: 'The ultimate cold brew.' }, cleanCopy);
 response = await coach(request({ action: 'content', payload: copyPayload, session }), context); output = await response.json();
-assert.equal(response.status, 200); assert.deepEqual(output.copyReview.issues, []); assert.equal(output.copyEngineVersion, '1.0.0');
+assert.equal(response.status, 200); assert.deepEqual(output.copyReview.issues, []); assert.equal(output.copyEngineVersion, COPY_ENGINE_VERSION);
 assert.equal(__prompts.at(-1).config.temperature, .3); assert(__prompts.at(-1).contents.includes('banned phrase')); assert(__prompts.at(-1).contents.includes('Previous draft'));
 __responses.push({ ...cleanCopy, headline: 'The ultimate cold brew.' }, { ...cleanCopy, headline: 'The ultimate choice for 999 students.', primaryText: 'Different hook.\n\nTry a can from the cooler.' });
 response = await coach(request({ action: 'content', payload: copyPayload, session }), context); output = await response.json();
