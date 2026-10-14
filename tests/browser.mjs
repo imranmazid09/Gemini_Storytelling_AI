@@ -11,7 +11,7 @@ page.on('dialog', dialog => dialog.accept());
 const briefs = JSON.parse(await fs.readFile(new URL('../src/prebuilt-creative-briefs.json', import.meta.url)));
 const feedback = { alignment: { status: 'Aligned', summary: 'Specific campus break supports trial.', missingLink: '' }, storyReadiness: { status: 'Ready for hooks', summary: 'A student chooses a break.', priority: '' }, connection: 'Concrete student viewpoint.', responsibility: 'Only supplied facts.', beats: ['Setup', 'Tension', 'Resolution'].map(stage => ({ stage, sharpen: `Sharpen ${stage}` })), questions: ['What motivates the choice?'], rubric: [{ label: 'Focal viewpoint', level: 'Strong' }] };
 const hook = { tactic: 'Relatability', trigger: 'Identity call-out', hook: 'Between classes, make room for a break.', visual: 'A student opens the campus cooler.', onScreenText: 'Time for a small break.', audio: 'Cooler door opens.', whyItWorks: 'A recognizable campus moment.', claimCheck: 'No added product claims.' };
-const content = { primaryText: 'Your next class can wait for a small break. Find Copperline in the campus market cooler starting October 27.', headline: 'A between-class break', cta: 'Try a can from the cooler.', visualDirection: 'Can beside a student notebook.', altText: 'Cold brew can beside a notebook.', ethicalCheck: 'Fictional classroom facts only.', frames: [{ title: 'The break', copy: 'Time for a small break.', visual: 'Close-up of the can beside a notebook.' }] };
+const content = { primaryText: hook.hook + '\nCold brew for the between-class break.\n\nFind Copperline in the campus market cooler starting October 27.\nTry a can from the cooler.', headline: 'A between-class break', cta: 'Try a can from the cooler.', visualDirection: 'Can beside a student notebook.', altText: 'Cold brew can beside a notebook.', ethicalCheck: 'Fictional classroom facts only.', frames: [{ title: 'The break', copy: 'Time for a small break.', visual: 'Close-up of the can beside a notebook.' }] };
 const production = { summary: 'Create the approved static post.', scenes: [{ stage: 'Frame 1', time: 'Frame 1', visual: 'Place can beside notebook, leaving copy space.', audio: 'Not applicable — static format', onScreen: 'Time for a small break.' }], accessibility: 'Use the approved alt text and legible contrast.', educatorSummary: 'Copy and visual follow the approved brief.' };
 const failures = new Set(['brief', 'feedback', 'hooks', 'content', 'production']);
 const receiptMap = new Map(); let sequence = 0;
@@ -36,9 +36,9 @@ await page.route('**/api/record*', async route => {
 const clickRetry = async () => { await page.getByRole('alert').filter({ hasText: 'Test request failure' }).waitFor(); await page.getByRole('button', { name: 'Try again', exact: true }).click(); };
 const state = () => page.evaluate(() => JSON.parse(localStorage.getItem('storylab-project-v2')));
 await page.goto('http://127.0.0.1:4173');
-await page.getByLabel('Prebuilt creative brief', { exact: true }).waitFor();
-assert.equal(await page.getByLabel('Prebuilt creative brief', { exact: true }).locator('option').count(), 7);
-await page.getByLabel('Prebuilt creative brief', { exact: true }).selectOption('copperline');
+await page.getByRole('button', { name: 'Choose Copperline Cold Brew', exact: true }).waitFor();
+assert.equal(await page.locator('.brief-card').count(), 6);
+await page.getByRole('button', { name: 'Choose Copperline Cold Brew', exact: true }).click();
 assert.equal(await page.getByLabel('Fictional client', { exact: true }).inputValue(), 'Copperline Cold Brew');
 assert(await page.getByRole('button', { name: 'Lock creative brief', exact: true }).isDisabled());
 await page.getByLabel('I have read this brief.').check();
@@ -58,7 +58,7 @@ await page.getByRole('button', { name: 'Generate content draft' }).click(); awai
 await page.getByLabel('Call to action', { exact: true }).fill('');
 assert(await page.getByRole('button', { name: 'Approve content and build package' }).isDisabled());
 await page.getByLabel('Call to action', { exact: true }).fill(content.cta);
-await page.getByLabel('Primary text or caption', { exact: true }).fill(content.primaryText + ' Take a moment for yourself.');
+await page.getByLabel('Primary text or caption', { exact: true }).fill(content.primaryText.replace('Cold brew for the between-class break.', 'A coffee pause between classes.'));
 await page.getByRole('button', { name: 'Approve content and build package' }).click();
 await page.getByRole('button', { name: 'Build package', exact: true }).click(); await clickRetry();
 await page.getByRole('button', { name: 'Download content', exact: true }).waitFor();
@@ -109,4 +109,4 @@ await page.getByLabel('Single message', { exact: true }).fill('A changed message
 await page.getByText(/Autosave is unavailable/).waitFor();
 assert(await page.evaluate(() => { const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); return event.defaultPrevented; }));
 assert.deepEqual(errors, []);
-await browser.close(); console.log('PASS: dropdown, review gating, persistence, five AI retry paths, edit evidence, downloads, QR hash/tamper checking, mobile layout, autosave failure.');
+await browser.close(); console.log('PASS: comparison cards, review gating, persistence, five AI retry paths, edit evidence, downloads, QR hash/tamper checking, mobile layout, autosave failure.');

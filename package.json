@@ -13,7 +13,8 @@
     "test:browser": "node tests/browser.mjs",
     "test:selection": "node tests/brief-selection.mjs",
     "test:reliability": "node tests/reliability.mjs",
-    "test:requests": "node tests/request.mjs"
+    "test:requests": "node tests/request.mjs",
+    "test:copy": "node tests/copy.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",

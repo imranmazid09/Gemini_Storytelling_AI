@@ -1,4 +1,6 @@
 import type { Config, Context } from "@netlify/functions";
+import copyEngine from '../../copy-engine/v1.json' with { type: 'json' };
+import { copyTask, copyIssues, hookIssues } from '../../shared/copy.mjs';
 import { GoogleGenAI } from "@google/genai";
 import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
 import { removeDuplicateSections } from "../../shared/response.mjs";
@@ -128,11 +130,12 @@ Return JSON exactly shaped as:
     case "hooks":
       return {
         systemInstruction: `${shared}
+${copyEngine.hookPrompt}
 The hook is the first three seconds, not a caption paragraph. It must stop the scroll, help the intended
 audience recognize relevance and earn the next five seconds. Create extremely concise openings: the hook
 line must be no longer than 12 words and on-screen text no longer than 8 words. Coordinate three modes:
 what the audience sees immediately, reads immediately and hears immediately when audio is used.
-Use the requested tactic when supplied: Confession, Bold claim, Relatability, Contrast or Curiosity. For
+Use three different types: Question, Bold claim, Scene, Confession or Number. Include a requested type only when the evidence permits it; do not force three of the same type. For
 "Best fit", vary tactics appropriately for the campaign mode. Use pattern interrupt and identity call-out
 responsibly; never agitate trauma or vulnerability. Commercial bold claims must be supportable. Advocacy
 and nonprofit hooks must preserve agency and avoid pity, fearmongering or invented testimony.
@@ -151,9 +154,9 @@ Only develop hooks from a story whose recorded alignment status is "Aligned" and
 ${context}
 Return JSON shaped as:
 { "options": [{
-  "tactic": "Confession|Bold claim|Relatability|Contrast|Curiosity",
+  "tactic": "Question|Bold claim|Scene|Confession|Number",
   "trigger": "Pattern interrupt|Identity call-out|Credible tension",
-  "hook": "hook line, maximum 12 words",
+  "hook": "hook line, maximum 80 characters and 12 words",
   "visual": "first-frame visual, one short sentence",
   "onScreenText": "screen text, maximum 8 words",
   "audio": "spoken line or sound cue for the opening moment",
@@ -164,12 +167,17 @@ Return JSON shaped as:
     case "content":
       return {
         systemInstruction: `${shared}
+${copyEngine.systemPrompt}
+Banned phrases: ${copyEngine.bannedPhrases.join(", ")}.
+Format guidance: ${copyEngine.formats[String(payload.deliverable) as keyof typeof copyEngine.formats] || copyEngine.formats["Static Post"]}
+Approved examples (use only when the client/story facts match): ${JSON.stringify(copyEngine.examples)}
 Translate the student's approved story and hook into platform-ready social content. Adapt the output to the
 selected static post, carousel, short video or paid ad. Preserve the selected hook execution's visual,
 text and audio logic where it fits the final format. For a paid ad, keep claims supportable and the CTA
 appropriate. Apply the campaign-mode standards rather than making every post sound like advocacy.
 Make the copy ready to place in a design or editing tool. Provide exact text and concrete visual directions, no placeholders. Carousel frames contain a finished card headline and body in copy. Short video frames contain finished spoken lines or captions in copy, with visual shot instructions. A static post or paid ad has one frame. Preserve approved facts without embellishment. Include the locked mandatory detail and CTA. Do not invent student rationale.`,
-        prompt: `Create an editable social content draft.
+        prompt: `${copyTask(payload)}
+Create an editable social content draft.
 ${context}
 Return JSON shaped as:
 {
@@ -179,7 +187,7 @@ Return JSON shaped as:
   "visualDirection": "respectful visual concept",
   "altText": "accessible alt text for the primary visual",
   "ethicalCheck": "one responsibility or claim check",
-  "frames": [{"title": "optional frame/card/beat title", "copy": "short copy", "visual": "direction"}]
+  "frames": [{"title": "frame/card/beat title", "copy": "short copy", "visual": "direction"}]
 }.`,
       };
     case "production":
@@ -242,19 +250,27 @@ export default async function coach(req: Request, context: Context) {
     const ai = new GoogleGenAI({ apiKey });
     let output: Record<string, any> | undefined;
     let cleanup = 0;
+    let repairIssues: string[] = [];
+    let previousDraft = "";
+    let bestCopy: { draft: Record<string, any>; issues: string[]; cleanup: number } | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
       const result = await ai.models.generateContent({
         model,
-        contents: prompt + (attempt ? "\nThe previous response was invalid or repeated a labeled section. Return complete, clean JSON with no duplicate blocks." : ""),
-        config: { systemInstruction, temperature: body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json" },
+        contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts or changing the selected hook: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
+        config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "hooks" ? copyEngine.temperatures.hooks : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json" },
       });
       let parsed;
-      try { parsed = JSON.parse(cleanJson(result.text || "")); } catch { if (!attempt) continue; throw new Error('Invalid JSON'); }
+      try { parsed = JSON.parse(cleanJson(result.text || "")); } catch { if (!attempt) continue; if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Invalid JSON'); }
       const deduped = removeDuplicateSections(parsed);
-      if (deduped.removed && !attempt) continue;
-      if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) continue; throw new Error('Incomplete AI response'); }
-      output = deduped.result;
-      cleanup = deduped.removed;
+      if (deduped.removed && !attempt) { repairIssues = ['Remove repeated labeled sections.']; continue; }
+      if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
+      const issues = body.action === 'content' ? copyIssues(deduped.result, payload) : body.action === 'hooks' ? hookIssues(deduped.result, payload) : [];
+      if (body.action === 'content' && (!bestCopy || issues.length < bestCopy.issues.length)) bestCopy = { draft: deduped.result, issues, cleanup: deduped.removed };
+      if (issues.length && !attempt) { repairIssues = issues; previousDraft = JSON.stringify(deduped.result); continue; }
+      if (issues.length && body.action === 'hooks') throw new Error('Hook options did not meet the required type/length checks');
+      output = { ...deduped.result, ...(body.action === 'hooks' || body.action === 'content' ? { aiGenerated: true, copyEngineVersion: copyEngine.version } : {}) };
+      if (body.action === 'content' && bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; }
+      cleanup = body.action === 'content' && bestCopy ? bestCopy.cleanup : deduped.removed;
       break;
     }
     if (!output) throw new Error('No complete AI response');

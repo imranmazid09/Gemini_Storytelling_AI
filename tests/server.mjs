@@ -46,5 +46,15 @@ let project = freshProject(); project = edit(project, 'Content: cta', 'Try it.',
 assert.equal(project.history.length, 1); assert.equal(project.history[0].before, 'Try it.'); assert.equal(project.history[0].after, 'Try a can.');
 project = addEvent(project, 'Content approved', 'AI content accepted unchanged.', { unchanged: true });
 assert.equal(learningSummary(project).approvals[0].unchanged, true);
+const copyPayload = { briefFields: briefSet.briefs[0], hook: 'Notebook down. Cooler door open.', story: 'An approved fictional notebook and cooler scene.', deliverable: 'Static Post' };
+const cleanCopy = { primaryText: 'Notebook down. Cooler door open.\nCold brew for the between-class break.\n\nFind Copperline in the campus market cooler starting October 27.\nTry a can from the cooler.', headline: 'Cold brew for the between-class break.', cta: 'Try a can from the cooler.', visualDirection: 'Notebook beside the can.', altText: 'Notebook and cold brew can.', ethicalCheck: 'Supplied fictional facts only.', frames: [{ title: 'Frame', copy: 'Notebook down. Cooler door open.', visual: 'Notebook and can.' }] };
+__responses.push({ ...cleanCopy, headline: 'The ultimate cold brew.' }, cleanCopy);
+response = await coach(request({ action: 'content', payload: copyPayload, session }), context); output = await response.json();
+assert.equal(response.status, 200); assert.deepEqual(output.copyReview.issues, []); assert.equal(output.copyEngineVersion, '1.0.0');
+assert.equal(__prompts.at(-1).config.temperature, .3); assert(__prompts.at(-1).contents.includes('banned phrase')); assert(__prompts.at(-1).contents.includes('Previous draft'));
+__responses.push({ ...cleanCopy, headline: 'The ultimate cold brew.' }, { ...cleanCopy, headline: 'The ultimate choice for 999 students.', primaryText: 'Different hook.\n\nTry a can from the cooler.' });
+response = await coach(request({ action: 'content', payload: copyPayload, session }), context); output = await response.json();
+assert.equal(response.status, 200); assert.equal(output.headline, 'The ultimate cold brew.'); assert.equal(output.copyReview.issues.length, 1);
+console.log('PASS: content repair names failed checks, uses repair temperature, records engine version and returns the best complete flagged draft.');
 await fs.rm('.test-functions', { recursive: true });
 console.log('PASS: complete brief validation/retry, invalid JSON retry, duplicate regeneration/cleanup, hook gating, verification sessions, foreign receipts, privacy, edit coalescing.');

@@ -87,7 +87,7 @@ for (const action of Object.keys(stageFor)) {
  await page.getByRole('button', { name: 'Cancel request', exact: true }).waitFor();
  await page.getByRole('button', { name: 'New project', exact: true }).click();
  await page.getByRole('button', { name: 'Confirm change', exact: true }).click();
- await page.getByLabel('Prebuilt creative brief', { exact: true }).waitFor();
+ await page.locator('.brief-card').first().waitFor();
  await page.clock.fastForward(60000);
  const project = await page.evaluate(() => JSON.parse(localStorage.getItem('storylab-project-v2')));
  assert.equal(project.brief, null); assert.equal(project.aiOutputs.length, 0); assert.equal(project.history.length, 0);

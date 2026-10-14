@@ -4,7 +4,7 @@ Purpose: train students in advertising storytelling, from a specific audience te
 
 ## Step 1
 
-Two equal routes: a dropdown of six prebuilt fictional briefs, or one-click AI generation. Selecting a client loads its complete editable brief. Browsing unedited briefs is immediate. Changing clients or regenerating requires confirmation only when brief edits, a locked brief or downstream work would be discarded. Selecting or generating a brief brings the full editable review pane into view. All fields must be filled; the student checks “I have read this brief” before locking. Edits clear that checkbox. Locked briefs are read-only in every downstream stage. Unlocking requires confirmation and clears dependent work while preserving its revision evidence.
+Two equal routes: six comparison cards for prebuilt fictional briefs, or one-click AI generation. Selecting a client loads its complete editable brief. Each card shows client, industry, campaign type, advertising objective and single message before selection. Browsing unedited briefs is immediate. Changing clients or regenerating requires confirmation only when brief edits, a locked brief or downstream work would be discarded. Selecting or generating a brief brings the full editable review pane into view. All fields must be filled; the student checks “I have read this brief” before locking. Edits clear that checkbox. Locked briefs are read-only in every downstream stage. Unlocking requires confirmation and clears dependent work while preserving its revision evidence.
 
 Versioned classroom data lives in `src/prebuilt-creative-briefs.json`. Match the established brief schema without adding instructional fields. Label AI-generated briefs everywhere they appear. All supplied client facts are fictional classroom scenario facts. Do not present them as researched real-world evidence. Remove unsupported comparisons, superlatives, guaranteed performance, invented statistics and outcome promises. Deliverable suggestions use existing formats: static post, carousel, short video or paid ad.
 
@@ -37,3 +37,17 @@ Generate opaque tool-session receipts. Store only hashed session credentials, su
 The verification page reports server-confirmed AI calls and can locally check the original HTML document’s embedded record against the registered SHA-256 digest and retained AI input/output hashes. Files are not uploaded for checking. Anyone with the receipt link can view receipt metadata. Browser edits and browser timestamps remain self-reported; this verifies issuance and recorded AI calls, not student identity or authorship. A modified printed document cannot be checked byte-for-byte; retain the original HTML.
 
 When verification is unavailable, keep local work intact and offer an explicitly unverified local record. Never label an unissued receipt verified.
+
+## Copy engine
+
+Version the generation prompt, taxonomy, examples and format rules in copy-engine/v1.json. Preserve
+client tone rather than forcing a casual student voice on every assignment. Hooks use three different
+types; confession and number hooks must be supported by the approved story/brief. The selected hook
+is the exact opening line of generated content. Keep mandatory details, one CTA and clear short
+blocks, using only supplied facts. Remove examples that invent queues, brew duration, waitlists,
+performance advantages or outcomes.
+
+Run transparent copy checks and one repair with named failures. A remaining complete draft is marked
+Needs a human edit, never presented as finished copy. Student edits recheck the draft, with the
+approved hook visible for comparison. Record the engine version alongside generated drafts and in
+the learning document. These rules do not grade understanding or replace evidence-based judgment.

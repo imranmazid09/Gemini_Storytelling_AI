@@ -61,7 +61,7 @@ lightweight educator evidence.
 
 ## Briefs and student learning records
 
-Step 1 offers a six-client dropdown and one-click fictional AI briefs. Browsing unedited briefs is immediate; selecting or generating a brief brings its details into view. Confirmation protects edited, locked or downstream work. Instructor data is versioned in
+Step 1 offers six comparison cards and one-click fictional AI briefs. Browsing unedited briefs is immediate; selecting or generating a brief brings its details into view. Confirmation protects edited, locked or downstream work. Instructor data is versioned in
 `src/prebuilt-creative-briefs.json`. Every scenario is fictional; its evidence is supplied for classroom
 practice rather than verified real-world advertising claims. The locked structured brief feeds all later
 coaching. The student still writes the story and approves creative decisions.
@@ -117,3 +117,13 @@ can abort pending work. Late responses cannot overwrite a canceled or reset proj
 `npm run test:requests` checks unresponsive fetches/body reads, late responses and cancellation.
 `npm run test:reliability` exercises every AI action against stalled requests, failure/retry, reset,
 unlock and every structure selector, including browsers without native dialogs or AbortSignal.timeout.
+
+### Evidence-supported copy engine
+
+`copy-engine/v1.json` versions the prompt, safe examples, banned language, format guidance and hook
+taxonomy. Three hook options use different types and only supplied numbers. Content opens with the
+selected hook verbatim and preserves mandatory details and constraints. One repair attempt names the
+failed checks. If a complete draft still needs correction, retain the best attempt and show its
+remaining issues for student editing. Checks support review, not grading or factual certification.
+The selected hook remains visible beside the editor. Copy-engine versions are retained with AI
+outputs and in the downloadable learning record. The student continues to write the story.

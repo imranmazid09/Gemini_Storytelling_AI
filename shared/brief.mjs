@@ -10,7 +10,7 @@ export const missingBrief = (brief) => Object.entries(BRIEF_FIELDS).filter(([key
 export const briefText = (brief) => brief ? [brief.aiGenerated ? 'AI-generated fictional classroom brief' : 'Prebuilt fictional classroom brief', 'All client details are supplied classroom scenario facts, not verified real-world evidence.', ...Object.entries(BRIEF_FIELDS).map(([key, label]) => `${label}: ${getField(brief, key)}`)].join('\n') : '';
 export const CONTENT_FIELDS = ['primaryText', 'headline', 'cta', 'visualDirection', 'altText', 'ethicalCheck'];
 export function missingContent(content, format) {
-  const missing = CONTENT_FIELDS.filter(key => !String(content?.[key] || '').trim());
-  if (['video', 'carousel'].includes(format) && (!content?.frames?.length || content.frames.some(frame => ['title', 'copy', 'visual'].some(key => !String(frame[key] || '').trim())))) missing.push('complete frames / cards');
+  const missing = CONTENT_FIELDS.filter(key => typeof content?.[key] !== 'string' || !content[key].trim());
+  if (!Array.isArray(content?.frames) || content.frames.length === 0 || content.frames.some(frame => ['title', 'copy', 'visual'].some(key => typeof frame?.[key] !== 'string' || !frame[key].trim()))) missing.push('complete frames / cards');
   return missing;
 }
