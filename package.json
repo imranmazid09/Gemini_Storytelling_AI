@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "check": "npm run build",
     "test": "node tests/server.mjs",
-    "test:browser": "node tests/browser.mjs"
+    "test:browser": "node tests/browser.mjs",
+    "test:selection": "node tests/brief-selection.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",

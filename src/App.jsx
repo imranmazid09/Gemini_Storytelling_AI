@@ -76,11 +76,24 @@ function App() {
   const record = (action, detail, extra = {}) => update(previous => addEvent(previous, action, detail, extra));
   const invalidateStory = previous => ({ ...previous, feedback: null, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null });
   const clearDownstream = previous => ({ ...invalidateStory(previous), arcDrafts: {}, lockedBrief: null, readBrief: false, stage: 1 });
-  const confirmReplace = () => (!brief && !lockedBrief) || window.confirm('Replace this brief? This clears story, hook, content and package work. The learning log will keep the previous decisions.');
+  const revealBrief = () => window.requestAnimationFrame(() => {
+    const review = document.getElementById('brief-review');
+    review?.focus({ preventScroll: true });
+    review?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  const confirmReplace = () => {
+    const baseline = brief?.aiGenerated ? [...project.aiOutputs].reverse().find(item => item.action === 'brief')?.output : briefSet.briefs.find(item => item.id === brief?.id);
+    const edited = brief && baseline && JSON.stringify(brief) !== JSON.stringify(baseline);
+    const dependentWork = lockedBrief || Object.values(arcDrafts).some(value => value.trim()) || hookOptions.length || content || production;
+    return (!edited && !dependentWork) || window.confirm('Replace this brief? This clears your brief edits and any story, hook, content and package work. The learning log will keep the previous decisions.');
+  };
   const chooseBrief = id => {
     const selected = briefSet.briefs.find(item => item.id === id);
-    if (!selected || !confirmReplace()) return;
+    if (!selected) return;
+    if (brief?.id === id && !brief.aiGenerated) { revealBrief(); return; }
+    if (!confirmReplace()) return;
     update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(selected) }, 'Prebuilt brief selected', `${selected.client} · fictional classroom scenario`));
+    revealBrief();
   };
   const fillSample = () => { chooseBrief(briefSet.briefs[0].id); document.getElementById('studio')?.scrollIntoView(); };
   const updateBrief = (field, value) => {
@@ -120,7 +133,7 @@ function App() {
     if (busy.current) return;
     busy.current = true; setLoading(name); setError(''); setRetryAction('');
     try { await operation(); }
-    catch (failure) { setError(failure.name === 'TimeoutError' ? 'The request took too long. Your work is safe; try again.' : failure.message || 'The request failed. Your work is safe; try again.'); setRetryAction(name); record('Request failed', name); }
+    catch (failure) { setError(failure.name === 'TimeoutError' ? 'The request took too long. Your work is safe; try again.' : failure.message || 'The request failed. Your work is safe; try again.'); setRetryAction(name); record('Request failed', name); window.requestAnimationFrame(() => document.getElementById('request-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }
     finally { busy.current = false; setLoading(''); }
   };
   const generateBrief = () => {
@@ -129,6 +142,7 @@ function App() {
       const result = await requestCoach('brief', { previousClient: brief?.client || '', excludedIndustries: briefSet.briefs.map(item => item.cardIndustry) });
       if (missingBrief(result).length) throw new Error('The generated brief is incomplete. Try again.');
       update(previous => addEvent({ ...clearDownstream(previous), brief: result }, 'AI brief loaded', `${result.client} · AI-generated fictional scenario`));
+      revealBrief();
     });
   };
   const lockBrief = () => {
@@ -222,7 +236,7 @@ function App() {
           <button className="ghost-button" onClick={() => downloadReport(false)} disabled={Boolean(loading)}>Save a local copy of work and learning record</button>
           {saveError && <div className="error-banner" role="alert">{saveError}</div>}
           {verificationWarning && <div className="error-banner" role="status">{verificationWarning}</div>}
-          {error && <div className="error-banner" role="alert">{error} <button className="secondary-button" disabled={Boolean(loading)} onClick={retry}>Try again</button></div>}
+          {error && <div className="error-banner" id="request-error" role="alert">{error} <button className="secondary-button" disabled={Boolean(loading)} onClick={retry}>Try again</button></div>}
           <fieldset className="workspace-controls" disabled={Boolean(loading)}>
           <StageNav stage={stage} canVisit={canVisit} onSelect={setStage} />
 
@@ -423,11 +437,11 @@ function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGe
       <section className="panel">
         <PanelTitle icon={Sparkles} eyebrow="Step 1 · Generate" title="Generate with AI" description="Create a complete fictional advertising assignment in one click." />
         <button className="primary-button full" onClick={onGenerate} disabled={loading}>{loading ? <Spinner /> : <Sparkles size={18} />}{loading ? 'Preparing brief…' : brief?.aiGenerated ? 'Regenerate a brief' : 'Generate a brief'}</button>
-        <p className="micro-note">Review its facts and constraints before developing your story.</p>
+        <p className="micro-note" role="status">{loading ? "Working with AI. Keep this page open; generation may take up to a minute." : "The complete brief will open below. Review its facts and constraints before developing your story."}</p>
       </section>
     </div>
-    <section className="panel">
-      <PanelTitle icon={ClipboardCheck} eyebrow={brief?.aiGenerated ? 'AI-generated fictional brief' : 'Prebuilt fictional brief'} title="Read, review and lock" description="All client details are supplied classroom scenario facts, not verified real-world evidence. Keep claims within the brief." />
+    <section className="panel" id="brief-review" tabIndex={-1} aria-label="Selected brief details">
+      <PanelTitle icon={ClipboardCheck} eyebrow={brief?.aiGenerated ? 'AI-generated fictional brief' : 'Prebuilt fictional brief'} title={brief ? `Review: ${brief.client}` : 'Read, review and lock'} description="All client details are supplied classroom scenario facts, not verified real-world evidence. Keep claims within the brief." />
       {brief ? <>
         <div className="form-grid">{Object.entries(BRIEF_FIELDS).map(([key, label]) => <Field key={key} label={label} wide={!['cardIndustry', 'cardObjective', 'client', 'tone'].includes(key)}><textarea rows={key === 'background' || key === 'constraints' ? 3 : 2} value={getField(brief, key) || ''} disabled={locked} onChange={event => onUpdate(key, event.target.value)} /></Field>)}</div>
         {locked ? <button className="secondary-button" onClick={onUnlock}>Unlock to edit</button> : <>

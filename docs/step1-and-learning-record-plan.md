@@ -4,7 +4,7 @@ Purpose: train students in advertising storytelling, from a specific audience te
 
 ## Step 1
 
-Two equal routes: a dropdown of six prebuilt fictional briefs, or one-click AI generation. Selecting a client loads its complete editable brief. Changing clients or regenerating requires confirmation when work would be replaced. All fields must be filled; the student checks “I have read this brief” before locking. Edits clear that checkbox. Locked briefs are read-only in every downstream stage. Unlocking requires confirmation and clears dependent work while preserving its revision evidence.
+Two equal routes: a dropdown of six prebuilt fictional briefs, or one-click AI generation. Selecting a client loads its complete editable brief. Browsing unedited briefs is immediate. Changing clients or regenerating requires confirmation only when brief edits, a locked brief or downstream work would be discarded. Selecting or generating a brief brings the full editable review pane into view. All fields must be filled; the student checks “I have read this brief” before locking. Edits clear that checkbox. Locked briefs are read-only in every downstream stage. Unlocking requires confirmation and clears dependent work while preserving its revision evidence.
 
 Versioned classroom data lives in `src/prebuilt-creative-briefs.json`. Match the established brief schema without adding instructional fields. Label AI-generated briefs everywhere they appear. All supplied client facts are fictional classroom scenario facts. Do not present them as researched real-world evidence. Remove unsupported comparisons, superlatives, guaranteed performance, invented statistics and outcome promises. Deliverable suggestions use existing formats: static post, carousel, short video or paid ad.
 

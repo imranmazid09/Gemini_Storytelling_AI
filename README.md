@@ -61,7 +61,7 @@ lightweight educator evidence.
 
 ## Briefs and student learning records
 
-Step 1 offers a six-client dropdown and one-click fictional AI briefs. Instructor data is versioned in
+Step 1 offers a six-client dropdown and one-click fictional AI briefs. Browsing unedited briefs is immediate; selecting or generating a brief brings its details into view. Confirmation protects edited, locked or downstream work. Instructor data is versioned in
 `src/prebuilt-creative-briefs.json`. Every scenario is fictional; its evidence is supplied for classroom
 practice rather than verified real-world advertising claims. The locked structured brief feeds all later
 coaching. The student still writes the story and approves creative decisions.

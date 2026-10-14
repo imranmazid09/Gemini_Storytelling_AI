@@ -1347,3 +1347,5 @@ main {
 .primary-button:hover:not(:disabled) { background: #1b50b3; border-color: #1b50b3; }
 :focus-visible { outline: 3px solid #1865f2; outline-offset: 3px; }
 @media (max-width: 700px) { .package-actions { flex-wrap: wrap; } .package-actions button { width: 100%; } }
+
+#brief-review { scroll-margin-top: 120px; }
