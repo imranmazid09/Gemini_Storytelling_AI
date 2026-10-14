@@ -19,6 +19,7 @@ for (let i=0;i<briefs.length;i++) {
  assert(copyIssues({...content,headline: 'Guaranteed value for 999 students.'},payload).some(issue=>issue.includes('999')));
  assert(copyIssues({...content,headline: 'The ultimate choice.'},payload).some(issue=>issue.includes('banned phrase')));
 }
+assert(copyIssues({primaryText:'Your outfit?\nSkip the crowded racks.\n\nNew drops every Friday.\nBrowse the Friday drop.',headline:'Vintage',cta:'Browse the Friday drop.',frames:[]},{briefFields:briefs[1],hook:'Your outfit?',story:'A student browses Friday listings.'}).some(issue=>issue.includes('crowding')));
 assert(hookIssues({options:[{tactic:'Question',hook:'A?'},{tactic:'Scene',hook:'B.'},{tactic:'Number',hook:'1.'}]}, { story: '1 approved hour' }).length===0);
 assert(hookIssues({options:[{tactic:'Question',hook:'A?'},{tactic:'Question',hook:'B?'},{tactic:'Question',hook:'C?'}]}).some(issue=>issue.includes('different')));
 assert(hookIssues({options:[{tactic:'Question',hook:'a'.repeat(81)},{tactic:'Scene',hook:'B.'},{tactic:'Number',hook:'1.'}]}).some(issue=>issue.includes('80')));

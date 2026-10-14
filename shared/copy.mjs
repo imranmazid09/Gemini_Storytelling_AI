@@ -45,6 +45,8 @@ export function copyIssues(result, payload) {
   if (caption.split(/\n\s*\n/).some(paragraph => paragraph.trim().split('\n').length > 2)) issues.push('Use blocks of no more than two written lines, separated by blank lines.');
   const brief = briefFields(payload);
   const source = [payload.brief, JSON.stringify(brief), payload.story].join(' ');
+  const narrativeSource = normalize([brief.background, brief.audience, brief.reasonToBelieve, payload.story].join(' '));
+  if (/\b(crowded|crowding|queues?|waiting|endless searching)\b/i.test(creative) && !/\b(crowded|crowding|queues?|waiting|endless searching)\b/i.test(narrativeSource)) issues.push('Remove crowding, queues or waiting not supplied in the brief or approved story.');
   const approvedNumbers = new Set(numberText(source).match(/\b\d+(?:[.,]\d+)?\b/g) || []);
   const newNumbers = [...new Set((numberText(creative).match(/\b\d+(?:[.,]\d+)?\b/g) || []).filter(number => !approvedNumbers.has(number)))];
   if (newNumbers.length) issues.push(`Remove numbers not in the approved brief or story: ${newNumbers.join(', ')}.`);

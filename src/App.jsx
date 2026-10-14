@@ -296,6 +296,7 @@ function App() {
               onRead={value => { update({ readBrief: value }); record('Brief read confirmation', value ? 'Checked' : 'Unchecked'); }}
               onUpdate={updateBrief}
               onChoose={chooseBrief}
+              onOpenChooser={openBriefChooser}
               onGenerate={generateBrief}
               onLock={lockBrief}
               onUnlock={unlockBrief}
@@ -500,14 +501,14 @@ function StageNav({ stage, canVisit, onSelect }) {
 function LockedBrief({ brief, onUnlock }) {
   return <section className="panel locked-brief"><details><summary>Locked creative brief · {brief.client} · {brief.aiGenerated ? 'AI-generated' : 'Prebuilt'}</summary><pre>{briefText(brief)}</pre></details><button className="ghost-button" onClick={onUnlock}>Unlock to edit</button></section>;
 }
-function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGenerate, onLock, onUnlock, loading, pending }) {
+function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onOpenChooser, onGenerate, onLock, onUnlock, loading, pending }) {
   const missing = brief ? missingBrief(brief) : [];
   return <div className="brief-workspace">
     <div className="workspace-grid">
-      <section className="panel" id="brief-chooser">
-        <PanelTitle icon={BookOpen} eyebrow="Step 1 · Choose" title="Choose a prebuilt brief" description="Compare the industry, objective and single message before choosing a fictional client." />
-        <div className="brief-gallery" aria-label="Prebuilt creative briefs">{briefSet.briefs.map(item => <button type="button" className={`brief-card ${brief?.id === item.id && !brief.aiGenerated ? 'selected' : ''}`} aria-pressed={brief?.id === item.id && !brief.aiGenerated} aria-label={`Choose ${item.client}`} key={item.id} onClick={() => onChoose(item.id)}><span className="brief-card-meta">{item.cardIndustry} · {item.cardObjective}</span><strong>{item.client}</strong><span><b>Objective</b>{item.objective}</span><span><b>Single message</b>{item.singleMessage}</span>{brief?.id === item.id && !brief.aiGenerated && <small>Selected brief</small>}</button>)}</div>
-        <p className="micro-note">Six classroom scenarios · brief set {briefSet.version}</p>
+      <section className="panel">
+        <PanelTitle icon={BookOpen} eyebrow="Step 1 · Choose" title="Use a prebuilt brief" description="Start with one of six fictional advertising assignments." />
+        <button className="primary-button full" onClick={onOpenChooser}>Compare six briefs <ArrowRight size={18} /></button>
+        <p className="micro-note">Compare the objective and single message before choosing.</p>
       </section>
       <section className="panel">
         <PanelTitle icon={Sparkles} eyebrow="Step 1 · Generate" title="Generate with AI" description="Create a complete fictional advertising assignment in one click." />
@@ -515,6 +516,11 @@ function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGe
         <p className="micro-note" role="status">{loading ? "Working with AI. Keep this page open; generation may take up to a minute." : "The complete brief will open below. Review its facts and constraints before developing your story."}</p>
       </section>
     </div>
+    <section className="panel" id="brief-chooser">
+        <PanelTitle icon={BookOpen} eyebrow="Step 1 · Choose" title="Choose a prebuilt brief" description="Compare the industry, objective and single message before choosing a fictional client." />
+        <div className="brief-gallery" aria-label="Prebuilt creative briefs">{briefSet.briefs.map(item => <button type="button" className={`brief-card ${brief?.id === item.id && !brief.aiGenerated ? 'selected' : ''}`} aria-pressed={brief?.id === item.id && !brief.aiGenerated} aria-label={`Choose ${item.client}`} key={item.id} onClick={() => onChoose(item.id)}><span className="brief-card-meta">{item.cardIndustry} · {item.cardObjective}</span><strong>{item.client}</strong><span><b>Objective</b>{item.objective}</span><span><b>Single message</b>{item.singleMessage}</span>{brief?.id === item.id && !brief.aiGenerated && <small>Selected brief</small>}</button>)}</div>
+        <p className="micro-note">Six classroom scenarios · brief set {briefSet.version}</p>
+    </section>
     <section className="panel" id="brief-review" tabIndex={-1} aria-label="Selected brief details">
       <PanelTitle icon={ClipboardCheck} eyebrow={brief?.aiGenerated ? 'AI-generated fictional brief' : 'Prebuilt fictional brief'} title={brief ? `Review: ${brief.client}` : 'Read, review and lock'} description="All client details are supplied classroom scenario facts, not verified real-world evidence. Keep claims within the brief." />
       {brief ? <>
