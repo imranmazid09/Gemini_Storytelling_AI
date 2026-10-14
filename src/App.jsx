@@ -95,7 +95,14 @@ function App() {
     update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(selected) }, 'Prebuilt brief selected', `${selected.client} · fictional classroom scenario`));
     revealBrief();
   };
-  const fillSample = () => { chooseBrief(briefSet.briefs[0].id); document.getElementById('studio')?.scrollIntoView(); };
+  const openBriefChooser = () => {
+    setStage(1);
+    window.requestAnimationFrame(() => {
+      const chooser = document.getElementById('brief-chooser');
+      chooser?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      chooser?.querySelector('select')?.focus({ preventScroll: true });
+    });
+  };
   const updateBrief = (field, value) => {
     update(previous => {
       const next = structuredClone(previous.brief);
@@ -223,7 +230,7 @@ function App() {
     <div className="app-shell">
       <Header onReset={resetProject} busy={Boolean(loading)} />
       <main>
-        <Hero onStart={() => { if (!busy.current) setStage(stage); }} onSample={fillSample} busy={Boolean(loading)} />
+        <Hero onStart={() => { if (!busy.current) setStage(stage); }} onSample={openBriefChooser} busy={Boolean(loading)} />
         <section className="studio" id="studio">
           <div className="studio-heading">
             <div>
@@ -429,7 +436,7 @@ function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGe
   const missing = brief ? missingBrief(brief) : [];
   return <div className="brief-workspace">
     <div className="workspace-grid">
-      <section className="panel">
+      <section className="panel" id="brief-chooser">
         <PanelTitle icon={BookOpen} eyebrow="Step 1 · Choose" title="Choose a prebuilt brief" description="Select any fictional client. Its complete brief appears below." />
         <Field label="Prebuilt creative brief"><select value={briefSet.briefs.some(item => item.id === brief?.id) ? brief.id : ''} onChange={event => onChoose(event.target.value)}><option value="" disabled>Select a client…</option>{briefSet.briefs.map(item => <option value={item.id} key={item.id}>{item.client} · {item.cardIndustry} · {item.cardObjective}</option>)}</select></Field>
         <p className="micro-note">Six classroom scenarios · brief set {briefSet.version}</p>

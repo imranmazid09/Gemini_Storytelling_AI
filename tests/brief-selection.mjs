@@ -6,6 +6,12 @@ const page = await browser.newPage();
 let dialogs = 0;
 page.on('dialog', async dialog => { dialogs++; await dialog.dismiss(); });
 await page.goto(process.env.STORYLAB_URL || 'http://127.0.0.1:4173');
+await page.getByRole('button', { name: 'Load a prebuilt brief', exact: true }).click();
+await page.getByLabel('Prebuilt creative brief', { exact: true }).waitFor();
+assert.equal(await page.getByLabel('Prebuilt creative brief', { exact: true }).inputValue(), '');
+assert.equal(await page.getByLabel('Fictional client', { exact: true }).count(), 0);
+assert(await page.getByLabel('Prebuilt creative brief', { exact: true }).evaluate(element => document.activeElement === element));
+await page.waitForFunction(() => { const y = document.getElementById('brief-chooser').getBoundingClientRect().top; return y >= 90 && y < 200; });
 const briefs = JSON.parse(await fs.readFile(new URL('../src/prebuilt-creative-briefs.json', import.meta.url))).briefs;
 for (const brief of briefs) {
   await page.getByLabel('Prebuilt creative brief', { exact: true }).selectOption(brief.id);
@@ -14,6 +20,8 @@ for (const brief of briefs) {
   assert.equal(await page.getByLabel('Background', { exact: true }).inputValue(), brief.background);
   await page.waitForFunction(() => { const y = document.getElementById('brief-review').getBoundingClientRect().top; return y >= 90 && y < 200; });
 }
+await page.getByRole('button', { name: 'Load a prebuilt brief', exact: true }).click();
+assert.equal(await page.getByLabel('Prebuilt creative brief', { exact: true }).inputValue(), briefs.at(-1).id, 'Opening chooser preserves the existing selection');
 assert.equal(dialogs, 0, 'Browsing unedited briefs must not open a confirmation');
 await page.getByLabel('Single message', { exact: true }).fill('My revised message.');
 await page.getByLabel('Prebuilt creative brief', { exact: true }).selectOption(briefs[0].id);

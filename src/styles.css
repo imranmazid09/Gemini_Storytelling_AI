@@ -1348,4 +1348,4 @@ main {
 :focus-visible { outline: 3px solid #1865f2; outline-offset: 3px; }
 @media (max-width: 700px) { .package-actions { flex-wrap: wrap; } .package-actions button { width: 100%; } }
 
-#brief-review { scroll-margin-top: 120px; }
+#brief-review, #brief-chooser { scroll-margin-top: 120px; }
