@@ -1,0 +1,125 @@
+{
+  "version": "2026.10",
+  "briefs": [
+    {
+      "id": "copperline",
+      "cardIndustry": "Food and Beverage",
+      "cardObjective": "Product Launch",
+      "client": "Copperline Cold Brew",
+      "background": "A canned cold brew is launching in campus-area stores. Focus on the between-class coffee run.",
+      "audience": "Students ages 18–24 who buy iced coffee regularly and value convenience.",
+      "objective": "Encourage students to try one can during launch month.",
+      "singleMessage": "Cold brew for the between-class break.",
+      "reasonToBelieve": "Supplied fictional scenario facts: canned cold brew, stocked in campus market coolers; no taste, price or energy comparison is approved.",
+      "thinkFeelDo": {
+        "think": "A coffee break fits my schedule.",
+        "feel": "Ready for a small break.",
+        "do": "Try a can from the cooler."
+      },
+      "tone": "Playful and confident, never snobby.",
+      "mandatory": "Show the can. Include: Find it in the campus market cooler starting October 27.",
+      "constraints": "No health, energy, speed, taste superiority or price claims. Do not invent product proof.",
+      "deliverable": "Instagram static post"
+    },
+    {
+      "id": "threadloop",
+      "cardIndustry": "Retail",
+      "cardObjective": "Brand Reposition",
+      "client": "Threadloop",
+      "background": "A resale app wants students to see its listings as curated vintage rather than simply used clothing.",
+      "audience": "Thrift-curious students ages 18–29 who want a considered personal style.",
+      "objective": "Encourage students to browse the curated Friday drop.",
+      "singleMessage": "Vintage without the hunt.",
+      "reasonToBelieve": "Supplied fictional scenario facts: each listed piece is inspected, steamed and photographed before listing.",
+      "thinkFeelDo": {
+        "think": "Resale can look intentional.",
+        "feel": "Curious about my own style.",
+        "do": "Browse the Friday drop."
+      },
+      "tone": "Confident, a little witty.",
+      "mandatory": "Include: New drops every Friday.",
+      "constraints": "Do not mock fast-fashion buyers. No environmental benefits, exclusivity or availability claims beyond supplied facts.",
+      "deliverable": "Instagram carousel"
+    },
+    {
+      "id": "roomsync",
+      "cardIndustry": "Technology",
+      "cardObjective": "App Launch",
+      "client": "RoomSync",
+      "background": "A fictional roommate introduction app is preparing for housing selection in March.",
+      "audience": "Incoming first-year students who want to discuss routines before choosing a roommate.",
+      "objective": "Encourage students to download the app and take its preferences quiz.",
+      "singleMessage": "Start the roommate conversation before move-in.",
+      "reasonToBelieve": "Supplied fictional scenario facts: a quiz about routines and preferences; students choose what to share. No success statistics are supplied.",
+      "thinkFeelDo": {
+        "think": "I can start with a conversation.",
+        "feel": "Prepared to ask questions.",
+        "do": "Download the app and take the quiz."
+      },
+      "tone": "Warm, reassuring and practical.",
+      "mandatory": "Include: Take the preferences quiz before March housing selection.",
+      "constraints": "No matching guarantees, friendship promises or invented usage figures. Never show real student profiles or imply GVSU endorsement.",
+      "deliverable": "Short video"
+    },
+    {
+      "id": "fixery",
+      "cardIndustry": "Local Services",
+      "cardObjective": "Foot Traffic",
+      "client": "The Fixery",
+      "background": "A fictional repair shop near campus wants students to consider a local assessment instead of defaulting to mail-in service.",
+      "audience": "Students with cracked screens who rely on their phone daily and need price clarity.",
+      "objective": "Encourage walk-ins for an assessment during midterms.",
+      "singleMessage": "Start your screen repair close to campus.",
+      "reasonToBelieve": "Supplied fictional scenario facts: technicians provide an assessment and a price quote before repair. No repair time is approved.",
+      "thinkFeelDo": {
+        "think": "I can ask before committing.",
+        "feel": "Comfortable checking my options.",
+        "do": "Walk in for an assessment."
+      },
+      "tone": "Direct, honest and neighborly.",
+      "mandatory": "Include: 48 West Fulton, weekdays 9 to 6. This is a fictional classroom address.",
+      "constraints": "No same-day or between-class repair promises. No cheapest, certification or price comparison claims.",
+      "deliverable": "Instagram static post"
+    },
+    {
+      "id": "lakeshore",
+      "cardIndustry": "Entertainment",
+      "cardObjective": "Ticket Sales",
+      "client": "Lakeshore Summer Fest",
+      "background": "A fictional three-day lakeside music festival is opening early-bird sales before its lineup announcement.",
+      "audience": "West Michigan adults ages 18–34 planning summer activities.",
+      "objective": "Encourage early-bird ticket purchases before May 1.",
+      "singleMessage": "Three days, two stages, one shoreline.",
+      "reasonToBelieve": "Supplied fictional scenario facts: a three-day event with two stages beside a shoreline. No popularity or sales figures are supplied.",
+      "thinkFeelDo": {
+        "think": "This fits my summer plans.",
+        "feel": "Anticipation.",
+        "do": "Review event details and buy an early-bird ticket."
+      },
+      "tone": "Energetic and inviting.",
+      "mandatory": "Include: Early-bird ends May 1. Link in bio to tickets.",
+      "constraints": "No unconfirmed artists, crowd-size claims, most-photographed claims or guaranteed experiences.",
+      "deliverable": "Paid ad"
+    },
+    {
+      "id": "read-to-rise",
+      "cardIndustry": "Nonprofit",
+      "cardObjective": "Volunteer Recruitment",
+      "client": "Read to Rise",
+      "background": "A fictional reading program pairs trained college volunteers with elementary students for weekly reading sessions.",
+      "audience": "College students seeking a practical service opportunity.",
+      "objective": "Encourage students to sign up for volunteer training.",
+      "singleMessage": "Share one hour a week reading together.",
+      "reasonToBelieve": "Supplied fictional scenario facts: two-hour volunteer training, weekly one-hour reading sessions on campus. No literacy outcomes are supplied.",
+      "thinkFeelDo": {
+        "think": "I can make time to participate.",
+        "feel": "Welcomed and prepared.",
+        "do": "Sign up for training."
+      },
+      "tone": "Warm and hopeful, never guilt-driven.",
+      "mandatory": "Include: No experience needed; training provided. Sign up for training.",
+      "constraints": "No promises of improved literacy. Do not show real children’s faces or names, invent testimony or use guilt.",
+      "deliverable": "Instagram static post"
+    }
+  ]
+}

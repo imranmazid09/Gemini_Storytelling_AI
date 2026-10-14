@@ -1326,3 +1326,52 @@ main {
     padding-right: 18px;
   }
 }
+
+/* Focused brief review, learning record and verification additions. */
+.workspace-controls { border: 0; padding: 0; margin: 0; min-width: 0; }
+.brief-workspace { display: grid; gap: 24px; }
+.brief-workspace .workspace-grid { align-items: stretch; }
+.read-check { display: flex; align-items: center; gap: 16px; margin: 24px 0 16px; }
+.read-check input { width: 24px; height: 24px; }
+.locked-brief { margin: 24px 0; }
+.locked-brief summary { cursor: pointer; font-weight: 700; padding: 16px 0; }
+.locked-brief pre, .verification-page pre { white-space: pre-wrap; font: inherit; overflow-wrap: anywhere; }
+.frame-editor { border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: grid; gap: 16px; }
+.endorsement { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.verification-page { max-width: 900px; padding: 24px; margin: 24px auto; }
+.verification-page .panel { display: grid; gap: 24px; }
+.verification-page h1 { font-size: 36px; }
+.verification-page code { overflow-wrap: anywhere; }
+.error-banner .secondary-button { margin: 8px; }
+.primary-button { background: #1865f2; border-color: #1865f2; color: white; }
+.primary-button:hover:not(:disabled) { background: #1b50b3; border-color: #1b50b3; }
+:focus-visible { outline: 3px solid #1865f2; outline-offset: 3px; }
+@media (max-width: 700px) { .package-actions { flex-wrap: wrap; } .package-actions button { width: 100%; } }
+
+#brief-review, #brief-chooser { scroll-margin-top: 120px; }
+.request-status { position: sticky; top: 80px; z-index: 25; display: flex; align-items: center; gap: 16px; padding: 16px; margin: 16px 0; border: 1px solid #1865f2; border-radius: 12px; background: #fffefa; color: var(--ink); box-shadow: var(--shadow); }
+.request-status p { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+.request-status > div { flex: 1; }
+.confirmation-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(9,20,44,.55); display: grid; place-items: center; padding: 24px; }
+.confirmation-panel { max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.confirmation-panel p { margin: 24px 0; line-height: 1.6; }
+.confirmation-actions { display: flex; justify-content: flex-end; gap: 16px; flex-wrap: wrap; }
+.workspace-intro { font-size: 14px; line-height: 1.6; margin: 16px 0; white-space: normal; overflow: visible; overflow-wrap: anywhere; max-height: none; }
+.structure-status { margin: 16px 0; font-size: 14px; line-height: 1.5; }
+.arc-selector button[aria-pressed="true"] { border: 2px solid #1865f2; background: var(--blue-pale); }
+@media (max-width: 700px) { .request-status { flex-wrap: wrap; top: 64px; } .request-status button { width: 100%; } }
+
+#request-error { position: sticky; top: 80px; z-index: 25; }
+.brief-gallery { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+.brief-card { display: grid; gap: 12px; align-content: start; padding: 16px; min-width: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--ink); text-align: left; font-size: 14px; line-height: 1.5; }
+.brief-card > strong { font-size: 18px; }
+.brief-card b { display: block; font-size: 12px; color: var(--muted); }
+.brief-card-meta { color: var(--muted); font-size: 12px; }
+.brief-card:hover, .brief-card.selected { border-color: #1865f2; background: var(--blue-pale); }
+.brief-card.selected { box-shadow: inset 0 0 0 1px #1865f2; }
+.copy-review { padding: 16px; border: 1px solid #9b5707; border-radius: 12px; background: #fffefa; color: #714307; line-height: 1.6; }
+@media (max-width: 700px) { .brief-gallery { grid-template-columns: 1fr; } }
+.approved-hook { padding: 16px; margin: 16px 0; border-left: 4px solid #3559f5; background: var(--blue-pale); line-height: 1.6; }
+.approved-hook p { margin: 8px 0; }
+
+@media (min-width: 701px) and (max-width: 950px) { .brief-gallery { grid-template-columns: repeat(2, minmax(0,1fr)); } }

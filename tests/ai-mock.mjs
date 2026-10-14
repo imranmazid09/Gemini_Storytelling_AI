@@ -1,0 +1,1 @@
+export class GoogleGenAI { constructor() { this.models = { generateContent: async request => { globalThis.__prompts.push(request); const next = globalThis.__responses.shift(); if (next instanceof Error) throw next; return { text: typeof next === 'string' ? next : JSON.stringify(next) }; } }; } }

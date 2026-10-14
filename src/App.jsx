@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import { cloneElement, useEffect, useId, useMemo, useRef, useState } from "react";
+import briefSet from './prebuilt-creative-briefs.json';
+import { BRIEF_FIELDS, getField, briefText, missingBrief, missingContent } from '../shared/brief.mjs';
+import { useProject, addEvent, edit, learningSummary } from './project';
+import { downloadFile, makeReport, outputText, reportHtml, recordDigest } from './report';
+import Verification from './Verification';
+import { fetchJSON, requestFailure } from './request';
+import { COPY_ENGINE_VERSION, copyIssues } from '../shared/copy.mjs';
 import {
   ArrowRight,
   BookOpen,
@@ -49,363 +56,210 @@ const DELIVERABLES = [
   { id: "paid", name: "Paid Ad", output: "Primary text, headline, CTA and claim check" },
 ];
 
-const ORGANIZATION_TYPES = [
-  "Nonprofit",
-  "For-profit brand",
-  "Advocacy or civic coalition",
-  "Public service",
-  "Social enterprise",
-  "Other",
-];
-
-const OBJECTIVES_BY_ORG = {
-  Nonprofit: [
-    "Build awareness",
-    "Recruit volunteers",
-    "Raise donations",
-    "Increase program participation",
-    "Advocate for policy change",
-    "Engage supporters",
-    "Other",
-  ],
-  "For-profit brand": [
-    "Build brand awareness",
-    "Launch a product",
-    "Increase consideration",
-    "Encourage trial",
-    "Drive purchase",
-    "Build loyalty",
-    "Other",
-  ],
-  "Advocacy or civic coalition": [
-    "Mobilize public support",
-    "Influence policy",
-    "Engage lawmakers",
-    "Recruit coalition members",
-    "Raise advocacy funding",
-    "Other",
-  ],
-  "Public service": [
-    "Inform the public",
-    "Promote behavior change",
-    "Increase service use",
-    "Build public trust",
-    "Encourage preparedness",
-    "Other",
-  ],
-  "Social enterprise": [
-    "Build awareness",
-    "Increase consideration",
-    "Drive purchase",
-    "Demonstrate social impact",
-    "Invite community action",
-    "Other",
-  ],
-  Other: ["Build awareness", "Drive action", "Invite engagement", "Other"],
-};
-
-const TONE_OPTIONS = [
-  "Warm and credible",
-  "Hopeful and empowering",
-  "Conversational and relatable",
-  "Bold and confident",
-  "Urgent but respectful",
-  "Playful and energetic",
-  "Premium and refined",
-  "Educational and clear",
-  "Other",
-];
-
 const HOOK_TACTICS = [
-  { id: "recommended", name: "Best fit", description: "Let the coach choose for this campaign." },
-  { id: "confession", name: "Confession", description: "A candid mistake or changed belief." },
-  { id: "bold-claim", name: "Bold claim", description: "A supportable statement to prove." },
-  { id: "relatability", name: "Relatability", description: "Specific language that signals this is for me." },
-  { id: "contrast", name: "Contrast", description: "Old way versus a meaningful alternative." },
-  { id: "curiosity", name: "Curiosity", description: "Open a truthful question worth staying for." },
+  { id: 'recommended', name: 'Best fit', description: 'Three different approaches that fit your evidence and campaign.' },
+  { id: 'question', name: 'Question', description: 'A question the audience recognizes.' },
+  { id: 'bold-claim', name: 'Bold claim', description: 'A surprising statement supported by approved facts.' },
+  { id: 'scene', name: 'Scene', description: 'A concrete moment from your story.' },
+  { id: 'confession', name: 'Confession', description: 'Use only first-person words already supplied in your story.' },
+  { id: 'number', name: 'Number', description: 'Use only a number already approved in your brief or story.' },
 ];
-
-const initialBrief = {
-  organization: "",
-  orgType: "Nonprofit",
-  customOrgType: "",
-  objective: "Build awareness",
-  customObjective: "",
-  audience: "",
-  platform: "Instagram",
-  placement: "Organic post",
-  desiredEmotion: "Hope grounded in action",
-  tone: "Warm and credible",
-  customTone: "",
-  requiredMessage: "",
-};
-
-const sampleBrief = {
-  organization: "Grand River Food Collective",
-  orgType: "Nonprofit",
-  customOrgType: "",
-  objective: "Recruit volunteers",
-  customObjective: "",
-  audience: "College students who care about community but have limited time",
-  platform: "Instagram",
-  placement: "Organic post",
-  desiredEmotion: "Belonging and useful action",
-  tone: "Warm and credible",
-  customTone: "",
-  requiredMessage: "A two-hour shift helps stock choice-based grocery shelves.",
-};
 
 function App() {
-  const [stage, setStage] = useState(1);
-  const [briefInput, setBriefInput] = useState(initialBrief);
-  const [briefText, setBriefText] = useState("");
-  const [lockedBrief, setLockedBrief] = useState("");
-  const [arc, setArc] = useState("threeAct");
-  const [arcDrafts, setArcDrafts] = useState({});
-  const [feedback, setFeedback] = useState(null);
-  const [hookOptions, setHookOptions] = useState([]);
-  const [selectedHook, setSelectedHook] = useState("");
-  const [selectedHookPlan, setSelectedHookPlan] = useState(null);
-  const [hookTactic, setHookTactic] = useState("recommended");
-  const [storyLocked, setStoryLocked] = useState(false);
-  const [deliverable, setDeliverable] = useState("static");
-  const [content, setContent] = useState(null);
-  const [contentLocked, setContentLocked] = useState(false);
-  const [production, setProduction] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState("");
-  const [error, setError] = useState("");
-  const [exampleLoaded, setExampleLoaded] = useState(false);
-
-  const arcText = useMemo(
-    () =>
-      ARC_STRUCTURES[arc].fields
-        .map((field) => `${field}: ${arcDrafts[field] || ""}`)
-        .join("\n"),
-    [arc, arcDrafts],
-  );
-
-  const updateBrief = (field, value) => {
-    setExampleLoaded(false);
-    setBriefInput((previous) => ({ ...previous, [field]: value }));
+  const { project, update, reset, saveError } = useProject();
+  const { stage, brief, lockedBrief, readBrief, arc, arcDrafts, feedback, hookOptions, selectedHook, selectedHookPlan, hookTactic, storyLocked, deliverable, platform, content, contentLocked, production, history, reflection } = project;
+  const [loading, setLoading] = useState('');
+  const [error, setError] = useState('');
+  const [retryAction, setRetryAction] = useState('');
+  const [verificationWarning, setVerificationWarning] = useState('');
+  const busy = useRef(false);
+  const activeRequest = useRef(null);
+  const [confirmation, setConfirmation] = useState(null);
+  const askConfirm = message => new Promise(resolve => setConfirmation({ message, resolve }));
+  const answerConfirm = accepted => { confirmation?.resolve(accepted); setConfirmation(null); };
+  const cancelPending = (message = 'Request canceled. Your work is safe; try again when ready.') => {
+    const pending = activeRequest.current;
+    if (!pending) return;
+    activeRequest.current = null;
+    pending.controller.abort(requestFailure(message, 'AbortError'));
+    busy.current = false; setLoading(''); setError(message); setRetryAction(pending.name);
+    record('Request canceled', pending.name);
   };
-  const record = (action, detail) =>
-    setHistory((previous) => [...previous, { action, detail, time: new Date().toLocaleTimeString() }]);
-
-  const requestCoach = async (action, payload) => {
-    const response = await fetch("/api/coach", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, payload }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || "AI coaching request failed.");
-    }
-    return result;
+  const setStage = stage => { if (stage !== project.stage) { cancelPending(); setError(''); setRetryAction(''); } update({ stage }); };
+  const arcText = useMemo(() => ARC_STRUCTURES[arc].fields.map(field => `${field}: ${arcDrafts[field] || ''}`).join('\n'), [arc, arcDrafts]);
+  const record = (action, detail, extra = {}) => update(previous => addEvent(previous, action, detail, extra));
+  const invalidateStory = previous => ({ ...previous, feedback: null, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null });
+  const clearDownstream = previous => ({ ...invalidateStory(previous), arcDrafts: {}, lockedBrief: null, readBrief: false, stage: 1 });
+  const revealBrief = () => window.requestAnimationFrame(() => {
+    const review = document.getElementById('brief-review');
+    review?.focus({ preventScroll: true });
+    review?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  const confirmReplace = async () => {
+    const baseline = brief?.aiGenerated ? [...project.aiOutputs].reverse().find(item => item.action === 'brief')?.output : briefSet.briefs.find(item => item.id === brief?.id);
+    const edited = brief && baseline && JSON.stringify(brief) !== JSON.stringify(baseline);
+    const dependentWork = lockedBrief || Object.values(arcDrafts).some(value => value.trim()) || hookOptions.length || content || production;
+    return (!edited && !dependentWork) || await askConfirm('Replace this brief? This clears your brief edits and any story, hook, content and package work. The learning log will keep the previous decisions.');
   };
-
-  const run = async (name, operation) => {
-    setLoading(name);
-    setError("");
-    try {
-      await operation();
-    } catch (requestError) {
-      setError(requestError.message || "Something went wrong. Please try again.");
-    } finally {
-      setLoading("");
-    }
+  const chooseBrief = async id => {
+    const selected = briefSet.briefs.find(item => item.id === id);
+    if (!selected) return;
+    if (brief?.id === id && !brief.aiGenerated) { revealBrief(); return; }
+    if (!await confirmReplace()) return;
+    cancelPending();
+    update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(selected) }, 'Prebuilt brief selected', `${selected.client} · fictional classroom scenario`));
+    revealBrief();
   };
-
-  const fillSample = () => {
-    resetProject();
-    setExampleLoaded(true);
-    setBriefInput(sampleBrief);
-  };
-
-  const generateBrief = () =>
-    run("brief", async () => {
-      const result = await requestCoach("brief", briefInput);
-      setBriefText(result.brief);
-      record("AI brief generated", `${briefInput.organization} creative strategy brief`);
-    });
-
-  const lockBrief = () => {
-    setLockedBrief(briefText);
-    setArcDrafts({});
-    setFeedback(null);
-    setHookOptions([]);
-    setSelectedHook("");
-    setSelectedHookPlan(null);
-    setHookTactic("recommended");
-    setStoryLocked(false);
-    setContent(null);
-    setContentLocked(false);
-    setProduction(null);
-    record("Brief locked", "Student reviewed and approved the editable brief");
-    setStage(2);
-  };
-
-  const getStoryFeedback = () =>
-    run("feedback", async () => {
-      setHookOptions([]);
-      setSelectedHook("");
-      setSelectedHookPlan(null);
-      setStoryLocked(false);
-      const result = await requestCoach("feedback", {
-        brief: lockedBrief,
-        arc: ARC_STRUCTURES[arc].label,
-        draft: arcText,
-      });
-      setFeedback(result);
-      record(
-        "Story feedback requested",
-        `${ARC_STRUCTURES[arc].label} draft; brief alignment: ${result.alignment?.status || "Review required"}; story connection: ${result.storyReadiness?.status || "Review required"}`,
-      );
-    });
-
-  const updateStoryDraft = (field, value) => {
-    setArcDrafts((previous) => ({ ...previous, [field]: value }));
-    if (feedback || hookOptions.length || selectedHook) {
-      setFeedback(null);
-      setHookOptions([]);
-      setSelectedHook("");
-      setSelectedHookPlan(null);
-      setStoryLocked(false);
-    }
-  };
-
-  const generateHooks = () =>
-    run("hooks", async () => {
-      const result = await requestCoach("hooks", {
-        brief: lockedBrief,
-        arc: ARC_STRUCTURES[arc].label,
-        draft: arcText,
-        feedback,
-        organizationType: briefInput.orgType === "Other" ? briefInput.customOrgType : briefInput.orgType,
-        objective: briefInput.objective === "Other" ? briefInput.customObjective : briefInput.objective,
-        platform: briefInput.platform,
-        placement: briefInput.placement,
-        tactic: HOOK_TACTICS.find((option) => option.id === hookTactic)?.name,
-      });
-      setHookOptions(result.options || []);
-      record("Hook options requested", "Emotion-focused openings considered");
-    });
-
-  const lockStory = () => {
-    setStoryLocked(true);
-    record("Story and hook locked", selectedHook);
-    setStage(3);
-  };
-
-  const createContent = () =>
-    run("content", async () => {
-      const result = await requestCoach("content", {
-        brief: lockedBrief,
-        story: arcText,
-        hook: selectedHook,
-        hookExecution: selectedHookPlan,
-        deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
-        platform: briefInput.platform,
-        placement: briefInput.placement,
-      });
-      setContent(result);
-      setContentLocked(false);
-      record("Social content generated", `${briefInput.platform} ${deliverable} draft`);
-    });
-
-  const lockContent = () => {
-    setContentLocked(true);
-    record("Social content approved", "Student approved editable post/ad content");
-    setStage(4);
-  };
-
-  const createPackage = () =>
-    run("production", async () => {
-      const result = await requestCoach("production", {
-        brief: lockedBrief,
-        story: arcText,
-        hook: selectedHook,
-        hookExecution: selectedHookPlan,
-        deliverable: DELIVERABLES.find((item) => item.id === deliverable)?.name,
-        content,
-        platform: briefInput.platform,
-      });
-      setProduction(result);
-      record("Final package created", "Production directions and educator summary generated");
-    });
-
-  const resetProject = () => {
+  const openBriefChooser = () => {
     setStage(1);
-    setBriefInput(initialBrief);
-    setBriefText("");
-    setLockedBrief("");
-    setArc("threeAct");
-    setArcDrafts({});
-    setFeedback(null);
-    setHookOptions([]);
-    setSelectedHook("");
-    setSelectedHookPlan(null);
-    setHookTactic("recommended");
-    setStoryLocked(false);
-    setDeliverable("static");
-    setContent(null);
-    setContentLocked(false);
-    setProduction(null);
-    setHistory([]);
-    setExampleLoaded(false);
-    setError("");
+    window.requestAnimationFrame(() => {
+      const chooser = document.getElementById('brief-chooser');
+      chooser?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      chooser?.querySelector('button')?.focus({ preventScroll: true });
+    });
   };
-
-  const downloadReport = () => {
-    const lines = [
-      "STORYLAB PRO - EDUCATOR SNAPSHOT",
-      "",
-      `Organization: ${briefInput.organization}`,
-      `Deliverable: ${briefInput.platform} ${DELIVERABLES.find((item) => item.id === deliverable)?.name}`,
-      "",
-      "CREATIVE BRIEF",
-      lockedBrief,
-      "",
-      "STORY DRAFT",
-      arcText,
-      "",
-      "SELECTED HOOK",
-      selectedHook,
-      selectedHookPlan?.visual ? `Visual: ${selectedHookPlan.visual}` : "",
-      selectedHookPlan?.onScreenText ? `Text: ${selectedHookPlan.onScreenText}` : "",
-      selectedHookPlan?.audio ? `Audio: ${selectedHookPlan.audio}` : "",
-      "",
-      "FINAL CONTENT",
-      content?.primaryText || "",
-      content?.headline ? `Headline: ${content.headline}` : "",
-      content?.cta ? `CTA: ${content.cta}` : "",
-      "",
-      "COACHING SNAPSHOT",
-      feedback?.alignment ? `Brief alignment: ${feedback.alignment.status} - ${feedback.alignment.summary}` : "",
-      feedback?.storyReadiness ? `Story connection: ${feedback.storyReadiness.status} - ${feedback.storyReadiness.summary}` : "",
-      feedback?.connection || "",
-      feedback?.responsibility || "",
-      "",
-      "BEAT-BY-BEAT REVISION GUIDANCE",
-      ...(feedback?.beats || []).map((beat) => `${beat.stage}: ${beat.sharpen}`),
-      "",
-      "REVISION EVIDENCE",
-      ...history.map((entry) => `${entry.time} - ${entry.action}: ${entry.detail}`),
-      "",
-      "FINAL ETHICAL AND ACCESSIBILITY CHECK",
-      content?.ethicalCheck || "",
-      production?.accessibility || "",
-    ];
-    const file = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${(briefInput.organization || "storylab").replaceAll(" ", "_")}_educator_snapshot.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+  const updateBrief = (field, value) => {
+    cancelPending('Request canceled because the brief changed. Try again with the updated brief.');
+    update(previous => {
+      const next = structuredClone(previous.brief);
+      const before = getField(next, field);
+      if (field.startsWith('thinkFeelDo.')) next.thinkFeelDo[field.split('.')[1]] = value;
+      else next[field] = value;
+      return { ...edit(previous, `Brief: ${BRIEF_FIELDS[field]}`, before, value), brief: next, readBrief: false };
+    });
   };
-
+  const ensureSession = async signal => {
+    if (project.session) return project.session;
+    const result = await fetchJSON('/api/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start' }) }, { signal, timeout: 5000 });
+    if (!result.session) throw new Error('Verification session could not start.');
+    update({ session: result.session });
+    return result.session;
+  };
+  const requestCoach = async (action, payload, signal) => {
+    let session;
+    try { session = await ensureSession(signal); }
+    catch (failure) {
+      if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
+      setVerificationWarning('Server verification is unavailable. You can keep working and download a local record. AI calls without receipts cannot be verified later.');
+    }
+    const result = await fetchJSON('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload, session }) }, { signal, timeout: 40000 });
+    if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
+    const { _receipt, _cleanup, _receiptWarning, ...output } = result;
+    if (_receiptWarning) setVerificationWarning(_receiptWarning);
+    update(previous => {
+      let next = addEvent(previous, 'AI response received', action, { aiAction: action });
+      next = { ...next, aiOutputs: [...next.aiOutputs, { action, at: new Date().toISOString(), copyEngineVersion: output.copyEngineVersion || null, input: payload, output }], receipts: _receipt ? [...next.receipts, _receipt] : next.receipts };
+      return _cleanup ? addEvent(next, 'Duplicate sections removed', `${_cleanup} repeated sections removed after one regeneration.`) : next;
+    });
+    return output;
+  };
+  const run = async (name, operation) => {
+    if (busy.current) return;
+    const controller = new AbortController();
+    activeRequest.current = { name, controller };
+    busy.current = true; setLoading(name); setError(''); setRetryAction('');
+    const deadline = setTimeout(() => controller.abort(requestFailure('The request took too long. Your work is safe; try again.', 'TimeoutError')), 45000);
+    let onAbort;
+    const canceled = new Promise((_, reject) => {
+      onAbort = () => reject(controller.signal.reason || requestFailure('Request canceled.', 'AbortError'));
+      controller.signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try { await Promise.race([operation(controller.signal), canceled]); }
+    catch (failure) {
+      if (activeRequest.current?.controller !== controller) return;
+      setError(failure?.message || 'The request failed. Your work is safe; try again.');
+      setRetryAction(name); record('Request failed', name);
+    } finally {
+      clearTimeout(deadline); controller.signal.removeEventListener('abort', onAbort);
+      if (activeRequest.current?.controller === controller) { activeRequest.current = null; busy.current = false; setLoading(''); }
+    }
+  };
+  const generateBrief = async () => {
+    if (busy.current) return;
+    if (!await confirmReplace()) return;
+    cancelPending();
+    run('brief', async signal => {
+      const result = await requestCoach('brief', { previousClient: brief?.client || '', excludedIndustries: briefSet.briefs.map(item => item.cardIndustry) }, signal);
+      if (missingBrief(result).length) throw new Error('The generated brief is incomplete. Try again.');
+      update(previous => addEvent({ ...clearDownstream(previous), brief: result }, 'AI brief loaded', `${result.client} · AI-generated fictional scenario`));
+      revealBrief();
+    });
+  };
+  const lockBrief = () => {
+    if (!readBrief || !brief || missingBrief(brief).length) return;
+    cancelPending();
+    const baseline = brief.aiGenerated ? [...project.aiOutputs].reverse().find(item => item.action === 'brief')?.output : briefSet.briefs.find(item => item.id === brief.id);
+    const changed = JSON.stringify(brief) !== JSON.stringify(baseline);
+    update(previous => addEvent({ ...previous, lockedBrief: structuredClone(brief), stage: 2 }, 'Brief locked', `${brief.aiGenerated ? 'AI-generated' : 'Prebuilt'} brief ${changed ? 'edited before approval' : 'accepted unchanged'}; student checked that they read it.`, { unchanged: !changed, aiGenerated: Boolean(brief.aiGenerated) }));
+  };
+  const unlockBrief = async () => {
+    if (!await askConfirm('Unlock the creative brief? This clears downstream story, hook, content and package work. Your prior decisions remain in the learning record.')) return;
+    cancelPending();
+    update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(lockedBrief) }, 'Brief unlocked', 'Returned to Step 1; downstream work cleared.'));
+    revealBrief();
+  };
+  const getStoryFeedback = () => run('feedback', async signal => {
+    const result = await requestCoach('feedback', { brief: briefText(lockedBrief), briefFields: lockedBrief, arc: ARC_STRUCTURES[arc].label, draft: arcText }, signal);
+    update(previous => addEvent({ ...previous, feedback: result, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null }, 'Story feedback received', `Brief: ${result.alignment.status}; story: ${result.storyReadiness.status}.`, { assessment: result }));
+  });
+  const updateStoryDraft = (field, value) => { cancelPending('Request canceled because the story changed. Try again with the updated story.'); update(previous => ({ ...invalidateStory(edit(previous, `Story: ${field}`, previous.arcDrafts[field] || '', value)), arcDrafts: { ...previous.arcDrafts, [field]: value } })); };
+  const generateHooks = () => run('hooks', async signal => {
+    const result = await requestCoach('hooks', { brief: briefText(lockedBrief), briefFields: lockedBrief, arc: ARC_STRUCTURES[arc].label, draft: arcText, feedback, organizationType: lockedBrief.cardIndustry, objective: lockedBrief.objective, platform, placement: deliverable === 'paid' ? 'Paid ad' : 'Organic post', tactic: HOOK_TACTICS.find(item => item.id === hookTactic)?.name }, signal);
+    update({ hookOptions: result.options });
+    record('Hook options generated', 'Opening visual, text and audio options made available for selection.');
+  });
+  const lockStory = () => {
+    if (!selectedHook.trim() || !feedback || feedback.alignment.status !== 'Aligned' || feedback.storyReadiness.status !== 'Ready for hooks') return;
+    cancelPending();
+    const original = hookOptions.find(option => option.visual === selectedHookPlan?.visual && option.onScreenText === selectedHookPlan?.onScreenText);
+    const unchanged = original?.hook === selectedHook;
+    update(previous => addEvent({ ...previous, storyLocked: true, stage: 3 }, 'Story and hook approved', `Story entered in the workspace; AI hook ${unchanged ? 'accepted unchanged' : 'edited before approval'}.`, { unchanged }));
+  };
+  const createContent = async () => {
+    if (busy.current) return;
+    if (content && !await askConfirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
+    run('content', async signal => {
+      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, hook: selectedHook, hookExecution: selectedHookPlan, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform, placement: deliverable === 'paid' ? 'Paid ad' : 'Organic post' }, signal);
+      update({ content: result, contentLocked: false, production: null }); record('Content draft loaded', `${platform} ${deliverable}`);
+    });
+  };
+  const updateContent = next => { cancelPending('Request canceled because the content changed. Try again with the updated content.'); update(previous => {
+    let changed = previous;
+    for (const field of Object.keys(next)) if (JSON.stringify(next[field]) !== JSON.stringify(previous.content?.[field])) changed = edit(changed, `Content: ${field}`, previous.content?.[field], next[field]);
+    const reviewed = { ...next, copyReview: { version: next.copyEngineVersion || COPY_ENGINE_VERSION, issues: copyIssues(next, { briefFields: previous.lockedBrief, brief: briefText(previous.lockedBrief), story: arcText, hook: previous.selectedHook, deliverable: DELIVERABLES.find(item => item.id === previous.deliverable)?.name }) } };
+    return { ...changed, content: reviewed, contentLocked: false, production: null };
+  }); };
+  const lockContent = () => {
+    if (missingContent(content, deliverable).length || content?.copyReview?.issues?.length) return;
+    cancelPending();
+    const baseline = [...project.aiOutputs].reverse().find(item => item.action === 'content')?.output;
+    const unchanged = JSON.stringify(content) === JSON.stringify(baseline);
+    update(previous => addEvent({ ...previous, contentLocked: true, stage: 4 }, 'Content approved', unchanged ? 'AI content accepted unchanged.' : 'AI content edited before approval.', { unchanged }));
+  };
+  const createPackage = () => run('production', async signal => {
+    const result = await requestCoach('production', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, hook: selectedHook, hookExecution: selectedHookPlan, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, content, platform }, signal);
+    update({ production: result }); record('Production package created', 'Exact copy, frame / shot directions, audio and accessibility handoff.');
+  });
+  const resetProject = async () => {
+    if (!await askConfirm('Start a new project? This removes the current project and its learning log from this browser. Download your work first if you need it.')) return;
+    cancelPending(); reset(); setError(''); setRetryAction(''); setVerificationWarning(''); openBriefChooser();
+  };
+  const downloadOutput = () => { record('Content downloaded', 'Production handoff text file.'); downloadFile('storylab-content.txt', outputText(project), 'text/plain;charset=utf-8'); };
+  const downloadReport = (verified = true) => run(verified ? 'export' : 'localExport', async signal => {
+    const snapshot = addEvent(project, 'Learning record export requested', verified ? 'Requested server-issued verification receipt.' : 'Local unverified record.');
+    const report = makeReport(snapshot);
+    let receipt;
+    if (verified) {
+      const session = await ensureSession(signal);
+      receipt = await fetchJSON('/api/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'export', session, reportHash: await recordDigest(report), receipts: report.receipts, browserEventCount: report.history.length }) }, { signal, timeout: 20000 });
+    }
+    const html = await reportHtml(report, receipt, window.location.origin);
+    if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
+    record('Learning record downloaded', receipt ? `Verified receipt issued: ${receipt.id}` : 'Local unverified record.');
+    downloadFile('storylab-learning-record.html', html, 'text/html;charset=utf-8');
+  });
+  const retry = () => ({ brief: generateBrief, feedback: getStoryFeedback, hooks: generateHooks, content: createContent, production: createPackage, export: downloadReport, localExport: () => downloadReport(false) }[retryAction]?.());
+  const canRetry = retryAction === 'brief' ? stage === 1 : retryAction === 'feedback' ? stage === 2 && ARC_STRUCTURES[arc].fields.every(field => arcDrafts[field]?.trim()) : retryAction === 'hooks' ? stage === 2 && feedback?.alignment?.status === 'Aligned' && feedback?.storyReadiness?.status === 'Ready for hooks' : retryAction === 'content' ? stage === 3 && storyLocked : retryAction === 'production' ? stage === 4 && contentLocked : ['export', 'localExport'].includes(retryAction);
   const canVisit = (target) =>
     target === 1 ||
     (target === 2 && Boolean(lockedBrief)) ||
@@ -416,39 +270,49 @@ function App() {
     <div className="app-shell">
       <Header onReset={resetProject} />
       <main>
-        <Hero onStart={() => setStage(1)} onSample={fillSample} />
+        <Hero onStart={() => { if (!busy.current) setStage(stage); }} onSample={openBriefChooser} busy={Boolean(loading)} />
         <section className="studio" id="studio">
           <div className="studio-heading">
             <div>
               <p className="eyebrow">Student Workspace</p>
               <h2>Build one story. Sharpen every decision.</h2>
             </div>
-            {exampleLoaded && <span className="sample-pill">Example inputs loaded - edit freely</span>}
+
           </div>
+          <p className="workspace-intro">Your drafts and timestamped edits are saved in this browser. Verified downloads send only record hashes and call metadata to the tool. No names are collected. Anyone with the verification link can view its receipt.</p>
+          <button className="ghost-button" onClick={() => downloadReport(false)} disabled={Boolean(loading)}>Save a local copy of work and learning record</button>
+          {saveError && <div className="error-banner" role="alert">{saveError}</div>}
+          {verificationWarning && <div className="error-banner" role="status">{verificationWarning}</div>}
+          {loading && <div className="request-status" role="status" aria-live="polite" aria-label="Request progress"><Spinner /><div><b>{({ brief: 'Generating your creative brief…', feedback: 'Reviewing your story…', hooks: 'Creating hook options…', content: 'Generating your content draft…', production: 'Building your production package…', export: 'Preparing your verified record…', localExport: 'Preparing your local record…' })[loading]}</b><p>{saveError ? "Autosave is unavailable; keep this tab open." : "Your work is saved in this browser."} This request will stop within 45 seconds.</p></div><button className="secondary-button" onClick={() => cancelPending()}>Cancel request</button></div>}
+          {error && <div className="error-banner" id="request-error" role="alert">{error} <button className="secondary-button" disabled={Boolean(loading) || !canRetry} onClick={retry}>Try again</button></div>}
+          <div className="workspace-controls">
           <StageNav stage={stage} canVisit={canVisit} onSelect={setStage} />
-          {error && <div className="error-banner">{error}</div>}
+
           {stage === 1 && (
             <BriefStage
-              values={briefInput}
+              brief={brief}
+              locked={Boolean(lockedBrief)}
+              readBrief={readBrief}
+              onRead={value => { update({ readBrief: value }); record('Brief read confirmation', value ? 'Checked' : 'Unchecked'); }}
               onUpdate={updateBrief}
-              briefText={briefText}
-              onTextChange={setBriefText}
+              onChoose={chooseBrief}
+              onOpenChooser={openBriefChooser}
               onGenerate={generateBrief}
               onLock={lockBrief}
-              loading={loading === "brief"}
+              onUnlock={unlockBrief}
+              loading={loading === 'brief'}
+              pending={Boolean(loading)}
             />
           )}
+          {stage > 1 && lockedBrief && <LockedBrief brief={lockedBrief} onUnlock={unlockBrief} />}
           {stage === 2 && (
             <StoryStage
               arc={arc}
-              onArcChange={(nextArc) => {
-                setArc(nextArc);
-                setArcDrafts({});
-                setFeedback(null);
-                setHookOptions([]);
-                setSelectedHook("");
-                setSelectedHookPlan(null);
-                setHookTactic("recommended");
+              onArcChange={async nextArc => {
+                if (nextArc === arc) return;
+                if (Object.values(arcDrafts).some(value => value.trim()) && !await askConfirm('Change story arc? This clears the current story and downstream work; your changes remain in the learning record.')) return;
+                cancelPending();
+                update(previous => addEvent({ ...invalidateStory(previous), arc: nextArc, arcDrafts: {} }, 'Story arc selected', ARC_STRUCTURES[nextArc].label));
               }}
               drafts={arcDrafts}
               onDraftChange={updateStoryDraft}
@@ -456,20 +320,17 @@ function App() {
               hookOptions={hookOptions}
               selectedHook={selectedHook}
               hookTactic={hookTactic}
-              onHookTactic={(nextTactic) => {
-                setHookTactic(nextTactic);
-                setHookOptions([]);
-                setSelectedHook("");
-                setSelectedHookPlan(null);
+              onHookTactic={nextTactic => {
+                cancelPending();
+                update({ hookTactic: nextTactic, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null });
+                record('Hook tactic selected', nextTactic);
               }}
-              onSelectHook={(option) => {
-                setSelectedHook(option.hook);
-                setSelectedHookPlan(option);
+              onSelectHook={option => {
+                cancelPending();
+                update({ selectedHook: option.hook, selectedHookPlan: option, storyLocked: false, content: null, contentLocked: false, production: null });
+                record('AI hook selected', option.hook);
               }}
-              onHookChange={(value) => {
-                setSelectedHook(value);
-                setSelectedHookPlan((previous) => previous ? { ...previous, hook: value } : { hook: value });
-              }}
+              onHookChange={value => { cancelPending(); update(previous => ({ ...edit(previous, 'Selected hook', previous.selectedHook, value), selectedHook: value, selectedHookPlan: { ...previous.selectedHookPlan, hook: value }, storyLocked: false, content: null, contentLocked: false, production: null })); }}
               onFeedback={getStoryFeedback}
               onHooks={generateHooks}
               onLock={lockStory}
@@ -479,18 +340,24 @@ function App() {
           {stage === 3 && (
             <ContentStage
               deliverable={deliverable}
-              onDeliverable={(nextDeliverable) => {
-                setDeliverable(nextDeliverable);
-                setContent(null);
-                setContentLocked(false);
-                setProduction(null);
+              onDeliverable={async nextDeliverable => {
+                if (nextDeliverable === deliverable) return;
+                if (content && !await askConfirm('Change format? This clears the current content and package. Your changes remain in the learning record.')) return;
+                cancelPending();
+                update(previous => addEvent({ ...previous, deliverable: nextDeliverable, content: null, contentLocked: false, production: null }, 'Deliverable selected', nextDeliverable));
               }}
+              onPlatform={async nextPlatform => {
+                if (content && !await askConfirm('Change platform? This clears the current content and package.')) return;
+                cancelPending();
+                update(previous => addEvent({ ...previous, platform: nextPlatform, content: null, contentLocked: false, production: null }, 'Platform selected', nextPlatform));
+              }}
+              selectedHook={selectedHook}
               content={content}
-              onContent={setContent}
+              onContent={updateContent}
               onGenerate={createContent}
               onLock={lockContent}
-              platform={briefInput.platform}
-              loading={loading === "content"}
+              platform={platform}
+              loading={loading}
             />
           )}
           {stage === 4 && (
@@ -498,20 +365,46 @@ function App() {
               content={content}
               production={production}
               deliverable={deliverable}
-              platform={briefInput.platform}
+              platform={platform}
               feedback={feedback}
               history={history}
               onGenerate={createPackage}
-              onDownload={downloadReport}
-              loading={loading === "production"}
+              summary={learningSummary(project)}
+              reflection={reflection}
+              onReflection={value => { cancelPending(); update(previous => ({ ...edit(previous, 'Student reflection', previous.reflection, value), reflection: value })); }}
+              onDownload={() => downloadReport(true)}
+              onLocalDownload={() => downloadReport(false)}
+              onOutput={downloadOutput}
+              loading={loading}
             />
           )}
+          </div>
         </section>
         <Principles />
       </main>
       <Footer />
+      {confirmation && <Confirmation message={confirmation.message} onAnswer={answerConfirm} />}
     </div>
   );
+}
+
+function Confirmation({ message, onAnswer }) {
+  const modal = useRef(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    modal.current?.querySelector('button')?.focus();
+    return () => previousFocus?.isConnected && previousFocus.focus();
+  }, []);
+  const onKey = event => {
+    if (event.key === 'Escape') { event.preventDefault(); onAnswer(false); }
+    if (event.key === 'Tab') {
+      const buttons = [...modal.current.querySelectorAll('button')];
+      const first = buttons[0], last = buttons.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  };
+  return <div className="confirmation-overlay"><section ref={modal} className="panel confirmation-panel" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-message" onKeyDown={onKey}><h2 id="confirmation-title">Confirm this change</h2><p id="confirmation-message">{message}</p><div className="confirmation-actions"><button className="secondary-button" onClick={() => onAnswer(false)}>Keep my work</button><button className="primary-button" onClick={() => onAnswer(true)}>Confirm change</button></div></section></div>;
 }
 
 function Header({ onReset }) {
@@ -519,7 +412,7 @@ function Header({ onReset }) {
     <header className="site-header">
       <a className="brand" href="#">
         <span className="brand-mark">S</span>
-        <span>StoryLab Pro</span>
+        <span>StoryLab Pro<small className="endorsement">By Dr Imran</small></span>
       </a>
       <nav className="header-links">
         <a href="#studio">Studio</a>
@@ -530,7 +423,7 @@ function Header({ onReset }) {
   );
 }
 
-function Hero({ onStart, onSample }) {
+function Hero({ onStart, onSample, busy }) {
   return (
     <section className="hero">
       <div className="hero-copy">
@@ -544,8 +437,8 @@ function Hero({ onStart, onSample }) {
           <a href="#studio" className="primary-button" onClick={onStart}>
             Start a project <ArrowRight size={18} />
           </a>
-          <button className="secondary-button" onClick={onSample}>
-            <Sparkles size={17} /> Load example inputs
+          <button className="secondary-button" onClick={onSample} disabled={busy}>
+            <Sparkles size={17} /> Load a prebuilt brief
           </button>
         </div>
         <div className="trust-row">
@@ -605,101 +498,47 @@ function StageNav({ stage, canVisit, onSelect }) {
   );
 }
 
-function BriefStage({ values, onUpdate, briefText, onTextChange, onGenerate, onLock, loading }) {
-  const objectives = OBJECTIVES_BY_ORG[values.orgType] || OBJECTIVES_BY_ORG.Other;
-  const missingCustomValue =
-    (values.orgType === "Other" && !values.customOrgType.trim()) ||
-    (values.objective === "Other" && !values.customObjective.trim()) ||
-    (values.tone === "Other" && !values.customTone.trim());
-  const updateOrganizationType = (type) => {
-    onUpdate("orgType", type);
-    onUpdate("customOrgType", "");
-    onUpdate("objective", OBJECTIVES_BY_ORG[type]?.[0] || OBJECTIVES_BY_ORG.Other[0]);
-    onUpdate("customObjective", "");
-  };
-  return (
+function LockedBrief({ brief, onUnlock }) {
+  return <section className="panel locked-brief"><details><summary>Locked creative brief · {brief.client} · {brief.aiGenerated ? 'AI-generated' : 'Prebuilt'}</summary><pre>{briefText(brief)}</pre></details><button className="ghost-button" onClick={onUnlock}>Unlock to edit</button></section>;
+}
+function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onOpenChooser, onGenerate, onLock, onUnlock, loading, pending }) {
+  const missing = brief ? missingBrief(brief) : [];
+  return <div className="brief-workspace">
     <div className="workspace-grid">
       <section className="panel">
-        <PanelTitle icon={Target} eyebrow="Step 1" title="Creative Strategy Brief" description="Define the assignment. AI prepares an editable brief for student approval." />
-        <div className="form-grid">
-          <Field label="Organization" wide>
-            <input value={values.organization} onChange={(event) => onUpdate("organization", event.target.value)} placeholder="Organization or brand name" />
-          </Field>
-          <Field label="Organization type">
-            <select value={values.orgType} onChange={(event) => updateOrganizationType(event.target.value)}>
-              {ORGANIZATION_TYPES.map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </Field>
-          {values.orgType === "Other" && (
-            <Field label="Describe organization type">
-              <input value={values.customOrgType} onChange={(event) => onUpdate("customOrgType", event.target.value)} placeholder="e.g., Student initiative" />
-            </Field>
-          )}
-          <Field label="Objective">
-            <select value={values.objective} onChange={(event) => onUpdate("objective", event.target.value)}>
-              {objectives.map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </Field>
-          {values.objective === "Other" && (
-            <Field label="Describe objective">
-              <input value={values.customObjective} onChange={(event) => onUpdate("customObjective", event.target.value)} placeholder="What should this communication accomplish?" />
-            </Field>
-          )}
-          <Field label="Audience" wide>
-            <textarea rows="3" value={values.audience} onChange={(event) => onUpdate("audience", event.target.value)} placeholder="Who should this story reach, and what matters to them?" />
-          </Field>
-          <Field label="Platform">
-            <select value={values.platform} onChange={(event) => onUpdate("platform", event.target.value)}>
-              {["Instagram", "TikTok", "Facebook", "LinkedIn", "YouTube Shorts"].map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </Field>
-          <Field label="Content type">
-            <select value={values.placement} onChange={(event) => onUpdate("placement", event.target.value)}>
-              {["Organic post", "Paid ad"].map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </Field>
-          <Field label="Desired audience feeling">
-            <input value={values.desiredEmotion} onChange={(event) => onUpdate("desiredEmotion", event.target.value)} />
-          </Field>
-          <Field label="Tone">
-            <select value={values.tone} onChange={(event) => onUpdate("tone", event.target.value)}>
-              {TONE_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-            </select>
-          </Field>
-          {values.tone === "Other" && (
-            <Field label="Describe tone">
-              <input value={values.customTone} onChange={(event) => onUpdate("customTone", event.target.value)} placeholder="e.g., Reassuring and practical" />
-            </Field>
-          )}
-          <Field label="Required message or approved claim (optional)" wide>
-            <textarea rows="2" value={values.requiredMessage} onChange={(event) => onUpdate("requiredMessage", event.target.value)} placeholder="Optional: approved fact, required CTA or claim limitation" />
-          </Field>
-        </div>
-        <button className="primary-button full" disabled={loading || !values.organization || !values.audience || missingCustomValue} onClick={onGenerate}>
-          {loading ? <Spinner /> : <Sparkles size={18} />}
-          {loading ? "Preparing brief..." : "Generate editable brief"}
-        </button>
+        <PanelTitle icon={BookOpen} eyebrow="Step 1 · Choose" title="Use a prebuilt brief" description="Start with one of six fictional advertising assignments." />
+        <button className="primary-button full" onClick={onOpenChooser}>Compare six briefs <ArrowRight size={18} /></button>
+        <p className="micro-note">Compare the objective and single message before choosing.</p>
       </section>
-      <section className="panel output-panel">
-        <PanelTitle icon={ClipboardCheck} eyebrow="AI draft" title="Review and lock" description="Edit the brief before moving into storytelling." />
-        {briefText ? (
-          <>
-            <textarea className="brief-editor" value={briefText} onChange={(event) => onTextChange(event.target.value)} />
-            <button className="primary-button full" onClick={onLock}>
-              Lock brief and continue <ArrowRight size={18} />
-            </button>
-          </>
-        ) : (
-          <EmptyState text="Your editable creative brief appears here after generation." />
-        )}
+      <section className="panel">
+        <PanelTitle icon={Sparkles} eyebrow="Step 1 · Generate" title="Generate with AI" description="Create a complete fictional advertising assignment in one click." />
+        <button className="primary-button full" onClick={onGenerate} disabled={pending}>{loading ? <Spinner /> : <Sparkles size={18} />}{loading ? 'Preparing brief…' : 'Generate a brief'}</button><button className="secondary-button full" onClick={onGenerate} disabled={pending || !brief?.aiGenerated}>Regenerate a brief</button>
+        <p className="micro-note" role="status">{loading ? "Working with AI. Keep this page open; generation may take up to a minute." : "The complete brief will open below. Review its facts and constraints before developing your story."}</p>
       </section>
     </div>
-  );
+    <section className="panel" id="brief-chooser">
+        <PanelTitle icon={BookOpen} eyebrow="Step 1 · Choose" title="Choose a prebuilt brief" description="Compare the industry, objective and single message before choosing a fictional client." />
+        <div className="brief-gallery" aria-label="Prebuilt creative briefs">{briefSet.briefs.map(item => <button type="button" className={`brief-card ${brief?.id === item.id && !brief.aiGenerated ? 'selected' : ''}`} aria-pressed={brief?.id === item.id && !brief.aiGenerated} aria-label={`Choose ${item.client}`} key={item.id} onClick={() => onChoose(item.id)}><span className="brief-card-meta">{item.cardIndustry} · {item.cardObjective}</span><strong>{item.client}</strong><span><b>Objective</b>{item.objective}</span><span><b>Single message</b>{item.singleMessage}</span>{brief?.id === item.id && !brief.aiGenerated && <small>Selected brief</small>}</button>)}</div>
+        <p className="micro-note">Six classroom scenarios · brief set {briefSet.version}</p>
+    </section>
+    <section className="panel" id="brief-review" tabIndex={-1} aria-label="Selected brief details">
+      <PanelTitle icon={ClipboardCheck} eyebrow={brief?.aiGenerated ? 'AI-generated fictional brief' : 'Prebuilt fictional brief'} title={brief ? `Review: ${brief.client}` : 'Read, review and lock'} description="All client details are supplied classroom scenario facts, not verified real-world evidence. Keep claims within the brief." />
+      {brief ? <>
+        <div className="form-grid">{Object.entries(BRIEF_FIELDS).map(([key, label]) => <Field key={key} label={label} wide={!['cardIndustry', 'cardObjective', 'client', 'tone'].includes(key)}><textarea rows={key === 'background' || key === 'constraints' ? 3 : 2} value={getField(brief, key) || ''} disabled={locked} onChange={event => onUpdate(key, event.target.value)} /></Field>)}</div>
+        {locked ? <button className="secondary-button" onClick={onUnlock}>Unlock to edit</button> : <>
+          <label className="read-check"><input type="checkbox" checked={readBrief} onChange={event => onRead(event.target.checked)} />I have read this brief.</label>
+          <p className="micro-note">{missing.length ? `Complete: ${missing.join(', ')}.` : !readBrief ? 'Confirm that you have read the brief to continue.' : 'You may approve this brief unchanged or after editing.'}</p>
+          <button className="primary-button" disabled={!readBrief || missing.length > 0 || loading} onClick={onLock}>Lock creative brief <ArrowRight size={18} /></button>
+        </>}
+      </> : <EmptyState text="Select a prebuilt client or generate a brief to begin." />}
+    </section>
+  </div>;
 }
 
 function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOptions, selectedHook, hookTactic, onHookTactic, onSelectHook, onHookChange, onFeedback, onHooks, onLock, loading }) {
   const structure = ARC_STRUCTURES[arc];
-  const hasDraft = structure.fields.every((field) => (drafts[field] || "").trim().length > 8);
+  const missingDraft = structure.fields.filter(field => !(drafts[field] || '').trim());
+  const hasDraft = missingDraft.length === 0;
   const isAligned = feedback?.alignment?.status === "Aligned";
   const isStoryReady = feedback?.storyReadiness?.status === "Ready for hooks";
   const canDevelopHooks = isAligned && isStoryReady;
@@ -709,11 +548,12 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
         <PanelTitle icon={BookOpen} eyebrow="Step 2" title="Develop your story" description="Center a person, a pressure and a change. Coaching stays focused and concise." />
         <div className="arc-selector">
           {Object.entries(ARC_STRUCTURES).map(([key, option]) => (
-            <button key={key} className={arc === key ? "chosen" : ""} onClick={() => onArcChange(key)}>
+            <button key={key} aria-pressed={arc === key} className={arc === key ? "chosen" : ""} onClick={() => onArcChange(key)}>
               <b>{option.label}</b><small>{option.description}</small>
             </button>
           ))}
         </div>
+        <p className="structure-status" role="status">Selected structure: <b>{structure.label}</b> · {structure.fields.join(" → ")}</p>
         <div className="arc-fields">
           {structure.fields.map((field) => (
             <Field label={field} key={field}>
@@ -726,9 +566,10 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
             </Field>
           ))}
         </div>
-        <button className="primary-button full" disabled={!hasDraft || loading === "feedback"} onClick={onFeedback}>
+        {missingDraft.length > 0 && <p className="micro-note">Complete: {missingDraft.join(', ')}.</p>}
+        <button className="primary-button full" disabled={!hasDraft || Boolean(loading)} onClick={onFeedback}>
           {loading === "feedback" ? <Spinner /> : <MessageSquareQuote size={18} />}
-          {feedback ? "Refresh focused feedback" : "Get focused feedback"}
+          {loading === "feedback" ? "Reviewing your story…" : feedback ? "Refresh focused feedback" : "Get focused feedback"}
         </button>
       </section>
       <aside className="story-aside">
@@ -784,7 +625,7 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
         )}
         {canDevelopHooks && (
           <section className="panel compact-panel hook-panel">
-            <PanelTitle icon={Sparkles} eyebrow="Hook workshop" title="Win the first 3 seconds" description="Stop the scroll, signal who this is for, and earn the next moment." />
+            <PanelTitle icon={Sparkles} eyebrow="AI-generated hook workshop" title="Win the first 3 seconds" description="Stop the scroll, signal who this is for, and earn the next moment." />
             <div className="hook-modes">
               <span><b>Visual</b> See</span>
               <span><b>Text</b> Read</span>
@@ -797,9 +638,9 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
             </Field>
             <p className="hook-tactic-note">{HOOK_TACTICS.find((option) => option.id === hookTactic)?.description}</p>
             {!hookOptions.length ? (
-              <button className="secondary-button full" onClick={onHooks} disabled={loading === "hooks"}>
+              <button className="secondary-button full" onClick={onHooks} disabled={Boolean(loading)}>
                 {loading === "hooks" ? <Spinner /> : <Sparkles size={17} />}
-                Create 3-second hooks
+                {loading === "hooks" ? "Creating hook options…" : "Create 3-second hooks"}
               </button>
             ) : (
               <>
@@ -819,7 +660,9 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
                 <Field label="Edit selected hook line">
                   <input value={selectedHook} onChange={(event) => onHookChange(event.target.value)} />
                 </Field>
-                <button className="primary-button full" disabled={!selectedHook.trim()} onClick={onLock}>
+                {selectedHook.length > 80 && <p className="micro-note">Shorten the hook to 80 characters or fewer before continuing.</p>}
+                {!selectedHook.trim() && <p className="micro-note">Select or write the opening hook line.</p>}
+                <button className="primary-button full" disabled={!selectedHook.trim() || selectedHook.length > 80} onClick={onLock}>
                   Approve story and hook <ArrowRight size={18} />
                 </button>
               </>
@@ -831,11 +674,15 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
   );
 }
 
-function ContentStage({ deliverable, onDeliverable, content, onContent, onGenerate, onLock, platform, loading }) {
+function ContentStage({ deliverable, onDeliverable, onPlatform, content, onContent, onGenerate, onLock, platform, loading, selectedHook }) {
+  const missing = missingContent(content, deliverable);
+  const reviewIssues = content?.copyReview?.issues || [];
   return (
     <div className="workspace-grid content-workspace">
       <section className="panel">
         <PanelTitle icon={PenLine} eyebrow="Step 3" title="Create your post or ad" description={`Translate the approved story into an editable ${platform} deliverable.`} />
+        <Field label="Publishing platform"><select value={platform} onChange={event => onPlatform(event.target.value)}>{['Instagram', 'TikTok', 'Facebook', 'LinkedIn', 'YouTube Shorts'].map(item => <option key={item}>{item}</option>)}</select></Field>
+        <div className="approved-hook"><b>Your approved opening hook</b><p>{selectedHook}</p><small>Keep this first line verbatim. Revise the hook in Story Studio if your strategy changes.</small></div>
         <div className="deliverables">
           {DELIVERABLES.map((item) => (
             <button key={item.id} className={deliverable === item.id ? "chosen" : ""} onClick={() => onDeliverable(item.id)}>
@@ -845,13 +692,13 @@ function ContentStage({ deliverable, onDeliverable, content, onContent, onGenera
           ))}
         </div>
         <button className="primary-button full" onClick={onGenerate} disabled={loading}>
-          {loading ? <Spinner /> : <Sparkles size={18} />}
-          {content ? "Generate revised content" : "Generate content draft"}
+          {loading === "content" ? <Spinner /> : <Sparkles size={18} />}
+          {loading === "content" ? "Generating content…" : content ? "Generate revised content" : "Generate content draft"}
         </button>
         <p className="micro-note">AI creates a starting draft. Students edit and approve the deliverable.</p>
       </section>
       <section className="panel output-panel">
-        <PanelTitle icon={MessageSquareQuote} eyebrow="Editable deliverable" title={DELIVERABLES.find((item) => item.id === deliverable)?.name || "Content"} />
+        <PanelTitle icon={MessageSquareQuote} eyebrow="AI-generated editable draft" title={DELIVERABLES.find((item) => item.id === deliverable)?.name || "Content"} />
         {content ? (
           <div className="content-editor">
             <Field label="Primary text or caption">
@@ -871,8 +718,11 @@ function ContentStage({ deliverable, onDeliverable, content, onContent, onGenera
             <Field label="Accessibility alt text">
               <textarea rows="2" value={content.altText || ""} onChange={(event) => onContent({ ...content, altText: event.target.value })} />
             </Field>
-            <FeedbackLine title="Responsible-use check" text={content.ethicalCheck} />
-            <button className="primary-button full" onClick={onLock}>
+            {(content.frames || []).map((frame, index) => <div className="frame-editor" key={index}><h4>Card / beat {index + 1}</h4>{['title', 'copy', 'visual'].map(field => <Field label={field === 'copy' ? 'Exact copy / spoken lines' : field === 'visual' ? 'Visual direction' : 'Title'} key={field}><textarea rows="2" value={frame[field] || ''} onChange={event => onContent({ ...content, frames: content.frames.map((item, i) => i === index ? { ...item, [field]: event.target.value } : item) })} /></Field>)}</div>)}
+            <Field label="Responsibility / claim check"><textarea rows="2" value={content.ethicalCheck || ''} onChange={event => onContent({ ...content, ethicalCheck: event.target.value })} /></Field>
+            {reviewIssues.length > 0 && <div className="copy-review" role="status"><b>Needs a human edit</b><ul>{reviewIssues.map(issue => <li key={issue}>{issue}</li>)}</ul><p>Edit the draft to resolve these checks before approval. Check facts and constraints yourself too.</p></div>}
+            {missing.length > 0 && <p className="micro-note">Complete: {missing.join(', ')}.</p>}
+            <button className="primary-button full" onClick={onLock} disabled={missing.length > 0 || reviewIssues.length > 0 || loading}>
               Approve content and build package <ArrowRight size={18} />
             </button>
           </div>
@@ -884,7 +734,7 @@ function ContentStage({ deliverable, onDeliverable, content, onContent, onGenera
   );
 }
 
-function PackageStage({ content, production, deliverable, platform, feedback, history, onGenerate, onDownload, loading }) {
+function PackageStage({ content, production, deliverable, platform, feedback, history, summary, reflection, onReflection, onGenerate, onDownload, onLocalDownload, onOutput, loading }) {
   const outputName = DELIVERABLES.find((item) => item.id === deliverable)?.name;
   return (
     <div className="package-layout">
@@ -892,17 +742,15 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
         <div>
           <p className="eyebrow">Step 4</p>
           <h3>Final production package</h3>
-          <p>{platform} {outputName}: execution guidance plus a compact educator record.</p>
+          <p>{`${platform} ${outputName}: execution guidance plus a compact educator record.`}</p>
         </div>
         <div className="package-actions">
           <button className="secondary-button" onClick={onGenerate} disabled={loading}>
-            {loading ? <Spinner /> : <Film size={17} />}
-            {production ? "Refresh package" : "Build package"}
+            {loading === "production" ? <Spinner /> : <Film size={17} />}
+            {loading === "production" ? "Building package…" : production ? "Refresh package" : "Build package"}
           </button>
           {production && (
-            <button className="primary-button" onClick={onDownload}>
-              <Download size={17} /> Educator snapshot
-            </button>
+            <><button className="secondary-button" onClick={onOutput}><Download size={17} /> Download content</button><button className="primary-button" onClick={onDownload}><Download size={17} /> Download verified learning record</button><button className="ghost-button" onClick={onLocalDownload}>Download local record</button></>
           )}
         </div>
       </section>
@@ -916,14 +764,14 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
               <div className="alt-box"><b>Alt text</b>{content?.altText}</div>
             </section>
             <section className="panel">
-              <PanelTitle icon={Film} eyebrow="Visual execution" title={deliverable === "video" ? "Storyboard" : "Frame plan"} />
+              <PanelTitle icon={Film} eyebrow="AI-generated execution directions" title={deliverable === "video" ? "Storyboard" : "Frame plan"} />
               <div className="scene-list">
                 {(production.scenes || []).map((scene, index) => (
                   <article key={`${scene.stage}-${index}`}>
                     <span>{scene.time}</span>
                     <h4>{scene.stage}</h4>
                     <p>{scene.visual}</p>
-                    <small>{scene.onScreen}</small>
+                    <small><b>On screen:</b> {scene.onScreen}</small><p><b>Audio:</b> {scene.audio}</p>
                   </article>
                 ))}
               </div>
@@ -937,10 +785,12 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
             </section>
             <section className="panel">
               <PanelTitle icon={ClipboardCheck} eyebrow="Educator snapshot" title="Evidence of revision" />
-              <p className="support-text">{production.educatorSummary}</p>
+              {summary.statements.map((statement, index) => <p className="support-text" key={index}>{statement}</p>)}
+              <Field label="Your reflection (optional): what did you change, and why does it serve the audience?"><textarea rows="4" value={reflection} onChange={event => onReflection(event.target.value)} /></Field>
+              <p className="micro-note">The learning record includes timestamps, before-and-after edits, AI drafts and approvals. Open the downloaded document to review, share, or print / save as PDF. Its QR links to a tool-issued receipt; browser edits do not prove authorship.</p>
               <div className="history">
                 {history.slice(-4).map((item) => (
-                  <span key={`${item.time}-${item.action}`}><b>{item.action}</b>{item.detail}</span>
+                  <span key={item.id}><b>{item.action}</b>{item.detail}</span>
                 ))}
               </div>
               {feedback?.rubric && (
@@ -999,12 +849,8 @@ function PanelTitle({ icon: Icon, eyebrow, title, description }) {
 }
 
 function Field({ label, children, wide }) {
-  return (
-    <label className={`field ${wide ? "wide" : ""}`}>
-      <span>{label}</span>
-      {children}
-    </label>
-  );
+  const id = useId();
+  return <div className={`field ${wide ? 'wide' : ''}`}><label htmlFor={id}>{label}</label>{cloneElement(children, { id })}</div>;
 }
 
 function AlignmentResult({ alignment }) {
@@ -1059,4 +905,7 @@ function Spinner() {
   return <RefreshCw className="spinner" size={18} />;
 }
 
-export default App;
+export default function StoryLabRouter() {
+  const match = window.location.pathname.match(/^\/verify\/([a-f0-9]{48})$/);
+  return match ? <Verification id={match[1]} /> : <App />;
+}

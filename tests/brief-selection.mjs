@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROME_PATH || undefined });
+const page = await browser.newPage();
+let dialogs = 0;
+page.on('dialog', async dialog => { dialogs++; await dialog.dismiss(); });
+await page.goto(process.env.STORYLAB_URL || 'http://127.0.0.1:4173');
+await page.getByRole('button', { name: 'Load a prebuilt brief', exact: true }).click();
+await page.locator('.brief-card').first().waitFor();
+assert.equal(await page.locator('.brief-card[aria-pressed="true"]').count(), 0);
+assert.equal(await page.getByLabel('Fictional client', { exact: true }).count(), 0);
+assert(await page.locator('.brief-card').first().evaluate(element => document.activeElement === element));
+assert.equal(await page.locator('.brief-card').count(), 6);
+await page.waitForFunction(() => { const y = document.getElementById('brief-chooser').getBoundingClientRect().top; return y >= 90 && y < 200; });
+const briefs = JSON.parse(await fs.readFile(new URL('../src/prebuilt-creative-briefs.json', import.meta.url))).briefs;
+for (const brief of briefs) {
+  const card = page.getByRole('button', { name: `Choose ${brief.client}`, exact: true });
+  const text = await card.innerText();
+  for (const value of [brief.cardIndustry, brief.objective, brief.singleMessage]) assert(text.includes(value));
+  await card.click();
+  await page.getByRole('heading', { name: `Review: ${brief.client}`, exact: true }).waitFor();
+  assert.equal(await page.getByLabel('Fictional client', { exact: true }).inputValue(), brief.client);
+  assert.equal(await page.getByLabel('Background', { exact: true }).inputValue(), brief.background);
+  await page.waitForFunction(() => { const y = document.getElementById('brief-review').getBoundingClientRect().top; return y >= 90 && y < 200; });
+}
+await page.getByRole('button', { name: 'Load a prebuilt brief', exact: true }).click();
+assert.equal(await page.locator('.brief-card[aria-pressed="true"]').getAttribute('aria-label'), `Choose ${briefs.at(-1).client}`, 'Opening gallery preserves the existing selection');
+assert.equal(dialogs, 0, 'Browsing unedited briefs must not open a confirmation');
+await page.getByLabel('Single message', { exact: true }).fill('My revised message.');
+await page.getByRole('button', { name: `Choose ${briefs[0].client}`, exact: true }).click();
+await page.getByRole('alertdialog').waitFor();
+assert.equal(dialogs, 0, 'No native browser dialogs are used');
+await page.getByRole('button', { name: 'Keep my work', exact: true }).click();
+assert.equal(await page.getByLabel('Single message', { exact: true }).inputValue(), 'My revised message.');
+await page.screenshot({ path: '/private/tmp/storylab-brief-selection-fixed.png' });
+await browser.close();
+console.log('PASS: all six comparison cards load complete details, scroll into view, no dialogs for unedited browsing, canceled replacement preserves edits.');
