@@ -195,6 +195,7 @@ function App() {
     if (!await askConfirm('Unlock the creative brief? This clears downstream story, hook, content and package work. Your prior decisions remain in the learning record.')) return;
     cancelPending();
     update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(lockedBrief) }, 'Brief unlocked', 'Returned to Step 1; downstream work cleared.'));
+    revealBrief();
   };
   const getStoryFeedback = () => run('feedback', async signal => {
     const result = await requestCoach('feedback', { brief: briefText(lockedBrief), arc: ARC_STRUCTURES[arc].label, draft: arcText }, signal);
@@ -239,7 +240,7 @@ function App() {
   });
   const resetProject = async () => {
     if (!await askConfirm('Start a new project? This removes the current project and its learning log from this browser. Download your work first if you need it.')) return;
-    cancelPending(); reset(); setError(''); setRetryAction(''); setVerificationWarning('');
+    cancelPending(); reset(); setError(''); setRetryAction(''); setVerificationWarning(''); openBriefChooser();
   };
   const downloadOutput = () => { record('Content downloaded', 'Production handoff text file.'); downloadFile('storylab-content.txt', outputText(project), 'text/plain;charset=utf-8'); };
   const downloadReport = (verified = true) => run(verified ? 'export' : 'localExport', async signal => {
