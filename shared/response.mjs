@@ -30,16 +30,30 @@ export function removeDuplicateSections(value) {
     if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, walk(child)]));
     if (typeof item !== 'string') return item;
     // Only explicit labeled blocks; equal copy in distinct fields is legitimate.
-    const blocks = item.split(/(?=^(?:#{1,3} )?[A-Z][A-Z /-]{3,}:?\s*$)/m);
+    const headingOf = line => {
+      const labeled = line.match(/^(?:#{1,3}[ \t]+(.+?)|([A-Za-z][A-Za-z /-]{3,}):)[ \t]*$/);
+      if (labeled) return labeled[1] || labeled[2];
+      if (/^[A-Z][A-Z /-]{3,}[ \t]*$/.test(line)) return line.trim();
+      if (/^(creative brief|story draft|selected hook|final content|revision evidence|coaching snapshot|final ethical and accessibility check)[ \t]*$/i.test(line)) return line.trim();
+      return null;
+    };
+    const lines = item.split('\n');
+    const blocks = [];
+    let block = { heading: null, lines: [] };
+    for (const line of lines) {
+      const heading = headingOf(line);
+      if (heading) { blocks.push(block); block = { heading, lines: [line] }; }
+      else block.lines.push(line);
+    }
+    blocks.push(block);
     const seen = [];
     return blocks.filter(block => {
-      const match = block.match(/^(?:#{1,3} )?([A-Z][A-Z /-]{3,}):?\s*\n([\s\S]*)$/);
-      if (!match) return true;
-      const [, heading, body] = match;
-      const duplicate = seen.some(previous => normalized(previous.heading) === normalized(heading) && similarity(previous.body, body) >= .9);
-      if (duplicate) removed++; else seen.push({ heading, body });
+      if (!block.heading) return true;
+      const body = block.lines.slice(1).join('\n');
+      const duplicate = seen.some(previous => normalized(previous.heading) === normalized(block.heading) && similarity(previous.body, body) >= .9);
+      if (duplicate) removed++; else seen.push({ heading: block.heading, body });
       return !duplicate;
-    }).join('');
+    }).map(block => block.lines.join('\n')).filter(Boolean).join('\n');
   };
   return { result: walk(value), removed };
 }

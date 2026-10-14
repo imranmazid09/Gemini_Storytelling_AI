@@ -38,6 +38,7 @@ assert.equal((await record(request({ action: 'export', session: '0'.repeat(48), 
 assert.equal((await record(request({ action: 'export', session, reportHash: 'c'.repeat(64), browserEventCount: 1, receipts: ['0'.repeat(48)] }), context)).status, 400);
 assert(!JSON.stringify([...__blobs.values()]).includes('Test draft.'));
 assert.equal(removeDuplicateSections({ copy: 'STORY DRAFT\nA student enters class.\nSTORY DRAFT\nA student enters class.' }).removed, 1);
+assert.equal(removeDuplicateSections({ copy: 'CREATIVE BRIEF\nA student enters class.\ncreative brief\nA student enters class.' }).removed, 1);
 assert.equal(removeDuplicateSections({ headline: 'Take a break', primaryText: 'Take a break' }).removed, 0);
 assert(similarity('one two three four five six seven eight nine ten', 'one two three four five six seven eight nine changed') >= .9);
 assert.equal(missingContent({ primaryText: 'x' }, 'video').length, 6);
