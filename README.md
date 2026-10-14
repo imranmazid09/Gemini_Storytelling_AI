@@ -105,3 +105,15 @@ downloads, QR digest checking and autosave failure. Install Playwright locally t
 `PLAYWRIGHT_MODULE` and `CHROME_PATH` can point to existing tooling. These tests do not consume AI
 credits. `npm run check` checks the production build. Live Gemini behavior still needs a preview
 smoke test after deploying with the existing server-side environment variables.
+
+### Request recovery and browser compatibility
+
+AI requests show a spinner/action label and a sticky status with Cancel request. The entire workspace is
+not disabled. The overall deadline is 45 seconds, using regular timers and AbortController rather than
+AbortSignal.timeout. Failed requests show a plain-language error and Try again. Draft edits cancel
+older requests. Reset and unlock use accessible in-page confirmation dialogs; confirming either
+can abort pending work. Late responses cannot overwrite a canceled or reset project.
+
+`npm run test:requests` checks unresponsive fetches/body reads, late responses and cancellation.
+`npm run test:reliability` exercises every AI action against stalled requests, failure/retry, reset,
+unlock and every structure selector, including browsers without native dialogs or AbortSignal.timeout.

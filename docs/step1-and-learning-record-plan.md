@@ -14,11 +14,11 @@ Story Studio remains student-authored with focused AI feedback, alignment and re
 
 ## Reliability
 
-Every failed AI request surfaces a plain-language error and a Try again button. Validate complete response shapes; regenerate an invalid response once, then show an error instead of partial output. Disable competing controls during a request.
+Every failed AI request surfaces a plain-language error and a Try again button. Validate complete response shapes; regenerate an invalid response once, then show an error instead of partial output. Keep the workspace navigable and drafts editable. Each request shows a button spinner, a visible action label, and a sticky status panel with Cancel request. Enforce a 45-second overall deadline with browser-compatible timers; slow session registration is limited to 5 seconds and AI calls to 40 seconds. Editing the relevant draft cancels the older request. Ignore late responses after cancellation or reset.
 
 Save full project state, revision history, retained AI drafts and receipt references to localStorage after changes. Restore on reload. The dirty flag clears only after a successful write. Warn before unload only for a pending or failed write. If storage fails, show a persistent autosave-unavailable banner and treat the project as unsaved until a new project is explicitly started. Allow a local learning-record download at any stage.
 
-New project, unlocking, switching a populated story arc, replacing a brief/content draft and clearing generated content for a different format/platform require confirmation.
+Use accessible in-page confirmation dialogs; do not rely on native window.confirm. New project and unlocking stay available during requests, and confirmed changes abort pending work. New project, unlocking, switching a populated story arc, replacing a brief/content draft and clearing generated content for a different format/platform require confirmation.
 
 A duplicated section is a top-level labeled block with the same heading (case-insensitive) and body identical after case/whitespace normalization or at least 90% identical. For structured responses, equivalent labeled array entries (stage/title/label) count as blocks. Do not remove intentionally shared copy from differently labeled fields. Discard a duplicate response and regenerate once. If repeats remain on the retry, remove later repeats, retain the first and log the cleanup. Validate the cleaned result before rendering.
 

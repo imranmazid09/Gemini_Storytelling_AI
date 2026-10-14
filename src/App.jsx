@@ -1,9 +1,10 @@
-import { cloneElement, useId, useMemo, useRef, useState } from "react";
+import { cloneElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import briefSet from './prebuilt-creative-briefs.json';
 import { BRIEF_FIELDS, getField, briefText, missingBrief, missingContent } from '../shared/brief.mjs';
 import { useProject, addEvent, edit, learningSummary } from './project';
 import { downloadFile, makeReport, outputText, reportHtml, recordDigest } from './report';
 import Verification from './Verification';
+import { fetchJSON, requestFailure } from './request';
 import {
   ArrowRight,
   BookOpen,
@@ -71,7 +72,19 @@ function App() {
   const [retryAction, setRetryAction] = useState('');
   const [verificationWarning, setVerificationWarning] = useState('');
   const busy = useRef(false);
-  const setStage = stage => update({ stage });
+  const activeRequest = useRef(null);
+  const [confirmation, setConfirmation] = useState(null);
+  const askConfirm = message => new Promise(resolve => setConfirmation({ message, resolve }));
+  const answerConfirm = accepted => { confirmation?.resolve(accepted); setConfirmation(null); };
+  const cancelPending = (message = 'Request canceled. Your work is safe; try again when ready.') => {
+    const pending = activeRequest.current;
+    if (!pending) return;
+    activeRequest.current = null;
+    pending.controller.abort(requestFailure(message, 'AbortError'));
+    busy.current = false; setLoading(''); setError(message); setRetryAction(pending.name);
+    record('Request canceled', pending.name);
+  };
+  const setStage = stage => { if (stage !== project.stage) { cancelPending(); setError(''); setRetryAction(''); } update({ stage }); };
   const arcText = useMemo(() => ARC_STRUCTURES[arc].fields.map(field => `${field}: ${arcDrafts[field] || ''}`).join('\n'), [arc, arcDrafts]);
   const record = (action, detail, extra = {}) => update(previous => addEvent(previous, action, detail, extra));
   const invalidateStory = previous => ({ ...previous, feedback: null, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null });
@@ -81,17 +94,18 @@ function App() {
     review?.focus({ preventScroll: true });
     review?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  const confirmReplace = () => {
+  const confirmReplace = async () => {
     const baseline = brief?.aiGenerated ? [...project.aiOutputs].reverse().find(item => item.action === 'brief')?.output : briefSet.briefs.find(item => item.id === brief?.id);
     const edited = brief && baseline && JSON.stringify(brief) !== JSON.stringify(baseline);
     const dependentWork = lockedBrief || Object.values(arcDrafts).some(value => value.trim()) || hookOptions.length || content || production;
-    return (!edited && !dependentWork) || window.confirm('Replace this brief? This clears your brief edits and any story, hook, content and package work. The learning log will keep the previous decisions.');
+    return (!edited && !dependentWork) || await askConfirm('Replace this brief? This clears your brief edits and any story, hook, content and package work. The learning log will keep the previous decisions.');
   };
-  const chooseBrief = id => {
+  const chooseBrief = async id => {
     const selected = briefSet.briefs.find(item => item.id === id);
     if (!selected) return;
     if (brief?.id === id && !brief.aiGenerated) { revealBrief(); return; }
-    if (!confirmReplace()) return;
+    if (!await confirmReplace()) return;
+    cancelPending();
     update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(selected) }, 'Prebuilt brief selected', `${selected.client} · fictional classroom scenario`));
     revealBrief();
   };
@@ -104,6 +118,7 @@ function App() {
     });
   };
   const updateBrief = (field, value) => {
+    cancelPending('Request canceled because the brief changed. Try again with the updated brief.');
     update(previous => {
       const next = structuredClone(previous.brief);
       const before = getField(next, field);
@@ -112,21 +127,22 @@ function App() {
       return { ...edit(previous, `Brief: ${BRIEF_FIELDS[field]}`, before, value), brief: next, readBrief: false };
     });
   };
-  const ensureSession = async () => {
+  const ensureSession = async signal => {
     if (project.session) return project.session;
-    const response = await fetch('/api/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start' }), signal: AbortSignal.timeout(15000) });
-    const result = await response.json();
-    if (!response.ok || !result.session) throw new Error(result.error || 'Verification session could not start.');
+    const result = await fetchJSON('/api/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start' }) }, { signal, timeout: 5000 });
+    if (!result.session) throw new Error('Verification session could not start.');
     update({ session: result.session });
     return result.session;
   };
-  const requestCoach = async (action, payload) => {
+  const requestCoach = async (action, payload, signal) => {
     let session;
-    try { session = await ensureSession(); } catch { setVerificationWarning('Server verification is unavailable. You can keep working and download a local record. AI calls without receipts cannot be verified later.'); }
-    const response = await fetch('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload, session }), signal: AbortSignal.timeout(55000) });
-    let result;
-    try { result = await response.json(); } catch { throw new Error('The coach returned an unreadable response. Try again.'); }
-    if (!response.ok) throw new Error(result.error || 'AI coaching request failed. Try again.');
+    try { session = await ensureSession(signal); }
+    catch (failure) {
+      if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
+      setVerificationWarning('Server verification is unavailable. You can keep working and download a local record. AI calls without receipts cannot be verified later.');
+    }
+    const result = await fetchJSON('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload, session }) }, { signal, timeout: 40000 });
+    if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
     const { _receipt, _cleanup, _receiptWarning, ...output } = result;
     if (_receiptWarning) setVerificationWarning(_receiptWarning);
     update(previous => {
@@ -138,15 +154,31 @@ function App() {
   };
   const run = async (name, operation) => {
     if (busy.current) return;
+    const controller = new AbortController();
+    activeRequest.current = { name, controller };
     busy.current = true; setLoading(name); setError(''); setRetryAction('');
-    try { await operation(); }
-    catch (failure) { setError(failure.name === 'TimeoutError' ? 'The request took too long. Your work is safe; try again.' : failure.message || 'The request failed. Your work is safe; try again.'); setRetryAction(name); record('Request failed', name); window.requestAnimationFrame(() => document.getElementById('request-error')?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }
-    finally { busy.current = false; setLoading(''); }
+    const deadline = setTimeout(() => controller.abort(requestFailure('The request took too long. Your work is safe; try again.', 'TimeoutError')), 45000);
+    let onAbort;
+    const canceled = new Promise((_, reject) => {
+      onAbort = () => reject(controller.signal.reason || requestFailure('Request canceled.', 'AbortError'));
+      controller.signal.addEventListener('abort', onAbort, { once: true });
+    });
+    try { await Promise.race([operation(controller.signal), canceled]); }
+    catch (failure) {
+      if (activeRequest.current?.controller !== controller) return;
+      setError(failure?.message || 'The request failed. Your work is safe; try again.');
+      setRetryAction(name); record('Request failed', name);
+    } finally {
+      clearTimeout(deadline); controller.signal.removeEventListener('abort', onAbort);
+      if (activeRequest.current?.controller === controller) { activeRequest.current = null; busy.current = false; setLoading(''); }
+    }
   };
-  const generateBrief = () => {
-    if (!confirmReplace()) return;
-    run('brief', async () => {
-      const result = await requestCoach('brief', { previousClient: brief?.client || '', excludedIndustries: briefSet.briefs.map(item => item.cardIndustry) });
+  const generateBrief = async () => {
+    if (busy.current) return;
+    if (!await confirmReplace()) return;
+    cancelPending();
+    run('brief', async signal => {
+      const result = await requestCoach('brief', { previousClient: brief?.client || '', excludedIndustries: briefSet.briefs.map(item => item.cardIndustry) }, signal);
       if (missingBrief(result).length) throw new Error('The generated brief is incomplete. Try again.');
       update(previous => addEvent({ ...clearDownstream(previous), brief: result }, 'AI brief loaded', `${result.client} · AI-generated fictional scenario`));
       revealBrief();
@@ -154,72 +186,77 @@ function App() {
   };
   const lockBrief = () => {
     if (!readBrief || !brief || missingBrief(brief).length) return;
+    cancelPending();
     const baseline = brief.aiGenerated ? [...project.aiOutputs].reverse().find(item => item.action === 'brief')?.output : briefSet.briefs.find(item => item.id === brief.id);
     const changed = JSON.stringify(brief) !== JSON.stringify(baseline);
     update(previous => addEvent({ ...previous, lockedBrief: structuredClone(brief), stage: 2 }, 'Brief locked', `${brief.aiGenerated ? 'AI-generated' : 'Prebuilt'} brief ${changed ? 'edited before approval' : 'accepted unchanged'}; student checked that they read it.`, { unchanged: !changed, aiGenerated: Boolean(brief.aiGenerated) }));
   };
-  const unlockBrief = () => {
-    if (!window.confirm('Unlock the creative brief? This clears downstream story, hook, content and package work. Your prior decisions remain in the learning record.')) return;
-    update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(previous.lockedBrief) }, 'Brief unlocked', 'Returned to Step 1; downstream work cleared.'));
+  const unlockBrief = async () => {
+    if (!await askConfirm('Unlock the creative brief? This clears downstream story, hook, content and package work. Your prior decisions remain in the learning record.')) return;
+    cancelPending();
+    update(previous => addEvent({ ...clearDownstream(previous), brief: structuredClone(lockedBrief) }, 'Brief unlocked', 'Returned to Step 1; downstream work cleared.'));
   };
-  const getStoryFeedback = () => run('feedback', async () => {
-    const result = await requestCoach('feedback', { brief: briefText(lockedBrief), arc: ARC_STRUCTURES[arc].label, draft: arcText });
+  const getStoryFeedback = () => run('feedback', async signal => {
+    const result = await requestCoach('feedback', { brief: briefText(lockedBrief), arc: ARC_STRUCTURES[arc].label, draft: arcText }, signal);
     update(previous => addEvent({ ...previous, feedback: result, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null }, 'Story feedback received', `Brief: ${result.alignment.status}; story: ${result.storyReadiness.status}.`, { assessment: result }));
   });
-  const updateStoryDraft = (field, value) => update(previous => ({ ...invalidateStory(edit(previous, `Story: ${field}`, previous.arcDrafts[field] || '', value)), arcDrafts: { ...previous.arcDrafts, [field]: value } }));
-  const generateHooks = () => run('hooks', async () => {
-    const result = await requestCoach('hooks', { brief: briefText(lockedBrief), arc: ARC_STRUCTURES[arc].label, draft: arcText, feedback, organizationType: lockedBrief.cardIndustry, objective: lockedBrief.objective, platform, placement: deliverable === 'paid' ? 'Paid ad' : 'Organic post', tactic: HOOK_TACTICS.find(item => item.id === hookTactic)?.name });
+  const updateStoryDraft = (field, value) => { cancelPending('Request canceled because the story changed. Try again with the updated story.'); update(previous => ({ ...invalidateStory(edit(previous, `Story: ${field}`, previous.arcDrafts[field] || '', value)), arcDrafts: { ...previous.arcDrafts, [field]: value } })); };
+  const generateHooks = () => run('hooks', async signal => {
+    const result = await requestCoach('hooks', { brief: briefText(lockedBrief), arc: ARC_STRUCTURES[arc].label, draft: arcText, feedback, organizationType: lockedBrief.cardIndustry, objective: lockedBrief.objective, platform, placement: deliverable === 'paid' ? 'Paid ad' : 'Organic post', tactic: HOOK_TACTICS.find(item => item.id === hookTactic)?.name }, signal);
     update({ hookOptions: result.options });
     record('Hook options generated', 'Opening visual, text and audio options made available for selection.');
   });
   const lockStory = () => {
     if (!selectedHook.trim() || !feedback || feedback.alignment.status !== 'Aligned' || feedback.storyReadiness.status !== 'Ready for hooks') return;
+    cancelPending();
     const original = hookOptions.find(option => option.visual === selectedHookPlan?.visual && option.onScreenText === selectedHookPlan?.onScreenText);
     const unchanged = original?.hook === selectedHook;
     update(previous => addEvent({ ...previous, storyLocked: true, stage: 3 }, 'Story and hook approved', `Story entered in the workspace; AI hook ${unchanged ? 'accepted unchanged' : 'edited before approval'}.`, { unchanged }));
   };
-  const createContent = () => {
-    if (content && !window.confirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
-    run('content', async () => {
-      const result = await requestCoach('content', { brief: briefText(lockedBrief), story: arcText, hook: selectedHook, hookExecution: selectedHookPlan, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform, placement: deliverable === 'paid' ? 'Paid ad' : 'Organic post' });
+  const createContent = async () => {
+    if (busy.current) return;
+    if (content && !await askConfirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
+    run('content', async signal => {
+      const result = await requestCoach('content', { brief: briefText(lockedBrief), story: arcText, hook: selectedHook, hookExecution: selectedHookPlan, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform, placement: deliverable === 'paid' ? 'Paid ad' : 'Organic post' }, signal);
       update({ content: result, contentLocked: false, production: null }); record('Content draft loaded', `${platform} ${deliverable}`);
     });
   };
-  const updateContent = next => update(previous => {
+  const updateContent = next => { cancelPending('Request canceled because the content changed. Try again with the updated content.'); update(previous => {
     let changed = previous;
     for (const field of Object.keys(next)) if (JSON.stringify(next[field]) !== JSON.stringify(previous.content?.[field])) changed = edit(changed, `Content: ${field}`, previous.content?.[field], next[field]);
     return { ...changed, content: next, contentLocked: false, production: null };
-  });
+  }); };
   const lockContent = () => {
     if (missingContent(content, deliverable).length) return;
+    cancelPending();
     const baseline = [...project.aiOutputs].reverse().find(item => item.action === 'content')?.output;
     const unchanged = JSON.stringify(content) === JSON.stringify(baseline);
     update(previous => addEvent({ ...previous, contentLocked: true, stage: 4 }, 'Content approved', unchanged ? 'AI content accepted unchanged.' : 'AI content edited before approval.', { unchanged }));
   };
-  const createPackage = () => run('production', async () => {
-    const result = await requestCoach('production', { brief: briefText(lockedBrief), story: arcText, hook: selectedHook, hookExecution: selectedHookPlan, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, content, platform });
+  const createPackage = () => run('production', async signal => {
+    const result = await requestCoach('production', { brief: briefText(lockedBrief), story: arcText, hook: selectedHook, hookExecution: selectedHookPlan, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, content, platform }, signal);
     update({ production: result }); record('Production package created', 'Exact copy, frame / shot directions, audio and accessibility handoff.');
   });
-  const resetProject = () => {
-    if (busy.current || !window.confirm('Start a new project? This removes the current project and its learning log from this browser. Download your work first if you need it.')) return;
-    reset(); setError(''); setRetryAction(''); setVerificationWarning('');
+  const resetProject = async () => {
+    if (!await askConfirm('Start a new project? This removes the current project and its learning log from this browser. Download your work first if you need it.')) return;
+    cancelPending(); reset(); setError(''); setRetryAction(''); setVerificationWarning('');
   };
   const downloadOutput = () => { record('Content downloaded', 'Production handoff text file.'); downloadFile('storylab-content.txt', outputText(project), 'text/plain;charset=utf-8'); };
-  const downloadReport = (verified = true) => run(verified ? 'export' : 'localExport', async () => {
+  const downloadReport = (verified = true) => run(verified ? 'export' : 'localExport', async signal => {
     const snapshot = addEvent(project, 'Learning record export requested', verified ? 'Requested server-issued verification receipt.' : 'Local unverified record.');
     const report = makeReport(snapshot);
     let receipt;
     if (verified) {
-      const session = await ensureSession();
-      const response = await fetch('/api/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'export', session, reportHash: await recordDigest(report), receipts: report.receipts, browserEventCount: report.history.length }), signal: AbortSignal.timeout(20000) });
-      receipt = await response.json();
-      if (!response.ok) throw new Error(receipt.error || 'Verification failed. Try again or download the local record.');
+      const session = await ensureSession(signal);
+      receipt = await fetchJSON('/api/record', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'export', session, reportHash: await recordDigest(report), receipts: report.receipts, browserEventCount: report.history.length }) }, { signal, timeout: 20000 });
     }
     const html = await reportHtml(report, receipt, window.location.origin);
+    if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
     record('Learning record downloaded', receipt ? `Verified receipt issued: ${receipt.id}` : 'Local unverified record.');
     downloadFile('storylab-learning-record.html', html, 'text/html;charset=utf-8');
   });
   const retry = () => ({ brief: generateBrief, feedback: getStoryFeedback, hooks: generateHooks, content: createContent, production: createPackage, export: downloadReport, localExport: () => downloadReport(false) }[retryAction]?.());
+  const canRetry = retryAction === 'brief' ? stage === 1 : retryAction === 'feedback' ? stage === 2 && ARC_STRUCTURES[arc].fields.every(field => arcDrafts[field]?.trim()) : retryAction === 'hooks' ? stage === 2 && feedback?.alignment?.status === 'Aligned' && feedback?.storyReadiness?.status === 'Ready for hooks' : retryAction === 'content' ? stage === 3 && storyLocked : retryAction === 'production' ? stage === 4 && contentLocked : ['export', 'localExport'].includes(retryAction);
   const canVisit = (target) =>
     target === 1 ||
     (target === 2 && Boolean(lockedBrief)) ||
@@ -228,7 +265,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Header onReset={resetProject} busy={Boolean(loading)} />
+      <Header onReset={resetProject} />
       <main>
         <Hero onStart={() => { if (!busy.current) setStage(stage); }} onSample={openBriefChooser} busy={Boolean(loading)} />
         <section className="studio" id="studio">
@@ -239,12 +276,13 @@ function App() {
             </div>
 
           </div>
-          <p className="micro-note">Your drafts and timestamped edits are saved in this browser. Verified downloads send only record hashes and call metadata to the tool. No names are collected. Anyone with the verification link can view its receipt.</p>
+          <p className="workspace-intro">Your drafts and timestamped edits are saved in this browser. Verified downloads send only record hashes and call metadata to the tool. No names are collected. Anyone with the verification link can view its receipt.</p>
           <button className="ghost-button" onClick={() => downloadReport(false)} disabled={Boolean(loading)}>Save a local copy of work and learning record</button>
           {saveError && <div className="error-banner" role="alert">{saveError}</div>}
           {verificationWarning && <div className="error-banner" role="status">{verificationWarning}</div>}
-          {error && <div className="error-banner" id="request-error" role="alert">{error} <button className="secondary-button" disabled={Boolean(loading)} onClick={retry}>Try again</button></div>}
-          <fieldset className="workspace-controls" disabled={Boolean(loading)}>
+          {loading && <div className="request-status" role="status" aria-live="polite" aria-label="Request progress"><Spinner /><div><b>{({ brief: 'Generating your creative brief…', feedback: 'Reviewing your story…', hooks: 'Creating hook options…', content: 'Generating your content draft…', production: 'Building your production package…', export: 'Preparing your verified record…', localExport: 'Preparing your local record…' })[loading]}</b><p>{saveError ? "Autosave is unavailable; keep this tab open." : "Your work is saved in this browser."} This request will stop within 45 seconds.</p></div><button className="secondary-button" onClick={() => cancelPending()}>Cancel request</button></div>}
+          {error && <div className="error-banner" id="request-error" role="alert">{error} <button className="secondary-button" disabled={Boolean(loading) || !canRetry} onClick={retry}>Try again</button></div>}
+          <div className="workspace-controls">
           <StageNav stage={stage} canVisit={canVisit} onSelect={setStage} />
 
           {stage === 1 && (
@@ -259,15 +297,17 @@ function App() {
               onLock={lockBrief}
               onUnlock={unlockBrief}
               loading={loading === 'brief'}
+              pending={Boolean(loading)}
             />
           )}
           {stage > 1 && lockedBrief && <LockedBrief brief={lockedBrief} onUnlock={unlockBrief} />}
           {stage === 2 && (
             <StoryStage
               arc={arc}
-              onArcChange={nextArc => {
+              onArcChange={async nextArc => {
                 if (nextArc === arc) return;
-                if (Object.values(arcDrafts).some(value => value.trim()) && !window.confirm('Change story arc? This clears the current story and downstream work; your changes remain in the learning record.')) return;
+                if (Object.values(arcDrafts).some(value => value.trim()) && !await askConfirm('Change story arc? This clears the current story and downstream work; your changes remain in the learning record.')) return;
+                cancelPending();
                 update(previous => addEvent({ ...invalidateStory(previous), arc: nextArc, arcDrafts: {} }, 'Story arc selected', ARC_STRUCTURES[nextArc].label));
               }}
               drafts={arcDrafts}
@@ -277,14 +317,16 @@ function App() {
               selectedHook={selectedHook}
               hookTactic={hookTactic}
               onHookTactic={nextTactic => {
+                cancelPending();
                 update({ hookTactic: nextTactic, hookOptions: [], selectedHook: '', selectedHookPlan: null, storyLocked: false, content: null, contentLocked: false, production: null });
                 record('Hook tactic selected', nextTactic);
               }}
               onSelectHook={option => {
+                cancelPending();
                 update({ selectedHook: option.hook, selectedHookPlan: option, storyLocked: false, content: null, contentLocked: false, production: null });
                 record('AI hook selected', option.hook);
               }}
-              onHookChange={value => update(previous => ({ ...edit(previous, 'Selected hook', previous.selectedHook, value), selectedHook: value, selectedHookPlan: { ...previous.selectedHookPlan, hook: value }, storyLocked: false, content: null, contentLocked: false, production: null }))}
+              onHookChange={value => { cancelPending(); update(previous => ({ ...edit(previous, 'Selected hook', previous.selectedHook, value), selectedHook: value, selectedHookPlan: { ...previous.selectedHookPlan, hook: value }, storyLocked: false, content: null, contentLocked: false, production: null })); }}
               onFeedback={getStoryFeedback}
               onHooks={generateHooks}
               onLock={lockStory}
@@ -294,13 +336,15 @@ function App() {
           {stage === 3 && (
             <ContentStage
               deliverable={deliverable}
-              onDeliverable={nextDeliverable => {
+              onDeliverable={async nextDeliverable => {
                 if (nextDeliverable === deliverable) return;
-                if (content && !window.confirm('Change format? This clears the current content and package. Your changes remain in the learning record.')) return;
+                if (content && !await askConfirm('Change format? This clears the current content and package. Your changes remain in the learning record.')) return;
+                cancelPending();
                 update(previous => addEvent({ ...previous, deliverable: nextDeliverable, content: null, contentLocked: false, production: null }, 'Deliverable selected', nextDeliverable));
               }}
-              onPlatform={nextPlatform => {
-                if (content && !window.confirm('Change platform? This clears the current content and package.')) return;
+              onPlatform={async nextPlatform => {
+                if (content && !await askConfirm('Change platform? This clears the current content and package.')) return;
+                cancelPending();
                 update(previous => addEvent({ ...previous, platform: nextPlatform, content: null, contentLocked: false, production: null }, 'Platform selected', nextPlatform));
               }}
               content={content}
@@ -308,7 +352,7 @@ function App() {
               onGenerate={createContent}
               onLock={lockContent}
               platform={platform}
-              loading={loading === "content"}
+              loading={loading}
             />
           )}
           {stage === 4 && (
@@ -322,23 +366,43 @@ function App() {
               onGenerate={createPackage}
               summary={learningSummary(project)}
               reflection={reflection}
-              onReflection={value => update(previous => ({ ...edit(previous, 'Student reflection', previous.reflection, value), reflection: value }))}
+              onReflection={value => { cancelPending(); update(previous => ({ ...edit(previous, 'Student reflection', previous.reflection, value), reflection: value })); }}
               onDownload={() => downloadReport(true)}
               onLocalDownload={() => downloadReport(false)}
               onOutput={downloadOutput}
-              loading={Boolean(loading)}
+              loading={loading}
             />
           )}
-          </fieldset>
+          </div>
         </section>
         <Principles />
       </main>
       <Footer />
+      {confirmation && <Confirmation message={confirmation.message} onAnswer={answerConfirm} />}
     </div>
   );
 }
 
-function Header({ onReset, busy }) {
+function Confirmation({ message, onAnswer }) {
+  const modal = useRef(null);
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    modal.current?.querySelector('button')?.focus();
+    return () => previousFocus?.isConnected && previousFocus.focus();
+  }, []);
+  const onKey = event => {
+    if (event.key === 'Escape') { event.preventDefault(); onAnswer(false); }
+    if (event.key === 'Tab') {
+      const buttons = [...modal.current.querySelectorAll('button')];
+      const first = buttons[0], last = buttons.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+  };
+  return <div className="confirmation-overlay"><section ref={modal} className="panel confirmation-panel" role="alertdialog" aria-modal="true" aria-labelledby="confirmation-title" aria-describedby="confirmation-message" onKeyDown={onKey}><h2 id="confirmation-title">Confirm this change</h2><p id="confirmation-message">{message}</p><div className="confirmation-actions"><button className="secondary-button" onClick={() => onAnswer(false)}>Keep my work</button><button className="primary-button" onClick={() => onAnswer(true)}>Confirm change</button></div></section></div>;
+}
+
+function Header({ onReset }) {
   return (
     <header className="site-header">
       <a className="brand" href="#">
@@ -348,7 +412,7 @@ function Header({ onReset, busy }) {
       <nav className="header-links">
         <a href="#studio">Studio</a>
         <a href="#approach">Approach</a>
-        <button className="ghost-button" disabled={busy} onClick={onReset}>New project</button>
+        <button className="ghost-button" onClick={onReset}>New project</button>
       </nav>
     </header>
   );
@@ -432,7 +496,7 @@ function StageNav({ stage, canVisit, onSelect }) {
 function LockedBrief({ brief, onUnlock }) {
   return <section className="panel locked-brief"><details><summary>Locked creative brief · {brief.client} · {brief.aiGenerated ? 'AI-generated' : 'Prebuilt'}</summary><pre>{briefText(brief)}</pre></details><button className="ghost-button" onClick={onUnlock}>Unlock to edit</button></section>;
 }
-function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGenerate, onLock, onUnlock, loading }) {
+function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGenerate, onLock, onUnlock, loading, pending }) {
   const missing = brief ? missingBrief(brief) : [];
   return <div className="brief-workspace">
     <div className="workspace-grid">
@@ -443,7 +507,7 @@ function BriefStage({ brief, locked, readBrief, onRead, onUpdate, onChoose, onGe
       </section>
       <section className="panel">
         <PanelTitle icon={Sparkles} eyebrow="Step 1 · Generate" title="Generate with AI" description="Create a complete fictional advertising assignment in one click." />
-        <button className="primary-button full" onClick={onGenerate} disabled={loading}>{loading ? <Spinner /> : <Sparkles size={18} />}{loading ? 'Preparing brief…' : brief?.aiGenerated ? 'Regenerate a brief' : 'Generate a brief'}</button>
+        <button className="primary-button full" onClick={onGenerate} disabled={pending}>{loading ? <Spinner /> : <Sparkles size={18} />}{loading ? 'Preparing brief…' : 'Generate a brief'}</button><button className="secondary-button full" onClick={onGenerate} disabled={pending || !brief?.aiGenerated}>Regenerate a brief</button>
         <p className="micro-note" role="status">{loading ? "Working with AI. Keep this page open; generation may take up to a minute." : "The complete brief will open below. Review its facts and constraints before developing your story."}</p>
       </section>
     </div>
@@ -474,11 +538,12 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
         <PanelTitle icon={BookOpen} eyebrow="Step 2" title="Develop your story" description="Center a person, a pressure and a change. Coaching stays focused and concise." />
         <div className="arc-selector">
           {Object.entries(ARC_STRUCTURES).map(([key, option]) => (
-            <button key={key} className={arc === key ? "chosen" : ""} onClick={() => onArcChange(key)}>
+            <button key={key} aria-pressed={arc === key} className={arc === key ? "chosen" : ""} onClick={() => onArcChange(key)}>
               <b>{option.label}</b><small>{option.description}</small>
             </button>
           ))}
         </div>
+        <p className="structure-status" role="status">Selected structure: <b>{structure.label}</b> · {structure.fields.join(" → ")}</p>
         <div className="arc-fields">
           {structure.fields.map((field) => (
             <Field label={field} key={field}>
@@ -492,9 +557,9 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
           ))}
         </div>
         {missingDraft.length > 0 && <p className="micro-note">Complete: {missingDraft.join(', ')}.</p>}
-        <button className="primary-button full" disabled={!hasDraft || loading === "feedback"} onClick={onFeedback}>
+        <button className="primary-button full" disabled={!hasDraft || Boolean(loading)} onClick={onFeedback}>
           {loading === "feedback" ? <Spinner /> : <MessageSquareQuote size={18} />}
-          {feedback ? "Refresh focused feedback" : "Get focused feedback"}
+          {loading === "feedback" ? "Reviewing your story…" : feedback ? "Refresh focused feedback" : "Get focused feedback"}
         </button>
       </section>
       <aside className="story-aside">
@@ -563,9 +628,9 @@ function StoryStage({ arc, onArcChange, drafts, onDraftChange, feedback, hookOpt
             </Field>
             <p className="hook-tactic-note">{HOOK_TACTICS.find((option) => option.id === hookTactic)?.description}</p>
             {!hookOptions.length ? (
-              <button className="secondary-button full" onClick={onHooks} disabled={loading === "hooks"}>
+              <button className="secondary-button full" onClick={onHooks} disabled={Boolean(loading)}>
                 {loading === "hooks" ? <Spinner /> : <Sparkles size={17} />}
-                Create 3-second hooks
+                {loading === "hooks" ? "Creating hook options…" : "Create 3-second hooks"}
               </button>
             ) : (
               <>
@@ -614,8 +679,8 @@ function ContentStage({ deliverable, onDeliverable, onPlatform, content, onConte
           ))}
         </div>
         <button className="primary-button full" onClick={onGenerate} disabled={loading}>
-          {loading ? <Spinner /> : <Sparkles size={18} />}
-          {content ? "Generate revised content" : "Generate content draft"}
+          {loading === "content" ? <Spinner /> : <Sparkles size={18} />}
+          {loading === "content" ? "Generating content…" : content ? "Generate revised content" : "Generate content draft"}
         </button>
         <p className="micro-note">AI creates a starting draft. Students edit and approve the deliverable.</p>
       </section>
@@ -663,12 +728,12 @@ function PackageStage({ content, production, deliverable, platform, feedback, hi
         <div>
           <p className="eyebrow">Step 4</p>
           <h3>Final production package</h3>
-          <p>{platform} {outputName}: execution guidance plus a compact educator record.</p>
+          <p>{`${platform} ${outputName}: execution guidance plus a compact educator record.`}</p>
         </div>
         <div className="package-actions">
           <button className="secondary-button" onClick={onGenerate} disabled={loading}>
-            {loading ? <Spinner /> : <Film size={17} />}
-            {production ? "Refresh package" : "Build package"}
+            {loading === "production" ? <Spinner /> : <Film size={17} />}
+            {loading === "production" ? "Building package…" : production ? "Refresh package" : "Build package"}
           </button>
           {production && (
             <><button className="secondary-button" onClick={onOutput}><Download size={17} /> Download content</button><button className="primary-button" onClick={onDownload}><Download size={17} /> Download verified learning record</button><button className="ghost-button" onClick={onLocalDownload}>Download local record</button></>

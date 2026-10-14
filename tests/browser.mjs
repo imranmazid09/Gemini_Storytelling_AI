@@ -87,6 +87,7 @@ await page.getByLabel(/Check the original/).setInputFiles('/private/tmp/storylab
 await page.getByText(/Mismatch:/).waitFor();
 await page.goto('http://127.0.0.1:4173');
 await page.getByRole('button', { name: 'New project', exact: true }).click();
+await page.getByRole('button', { name: 'Confirm change', exact: true }).click();
 assert.equal((await state()).history.length, 0);
 await page.getByRole('button', { name: 'Generate a brief', exact: true }).click(); await clickRetry();
 await page.getByText('AI-generated fictional brief', { exact: true }).waitFor();

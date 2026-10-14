@@ -25,7 +25,9 @@ assert.equal(await page.getByLabel('Prebuilt creative brief', { exact: true }).i
 assert.equal(dialogs, 0, 'Browsing unedited briefs must not open a confirmation');
 await page.getByLabel('Single message', { exact: true }).fill('My revised message.');
 await page.getByLabel('Prebuilt creative brief', { exact: true }).selectOption(briefs[0].id);
-assert.equal(dialogs, 1, 'Discarding edits requires a confirmation');
+await page.getByRole('alertdialog').waitFor();
+assert.equal(dialogs, 0, 'No native browser dialogs are used');
+await page.getByRole('button', { name: 'Keep my work', exact: true }).click();
 assert.equal(await page.getByLabel('Single message', { exact: true }).inputValue(), 'My revised message.');
 await page.screenshot({ path: '/private/tmp/storylab-brief-selection-fixed.png' });
 await browser.close();

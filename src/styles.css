@@ -1349,3 +1349,16 @@ main {
 @media (max-width: 700px) { .package-actions { flex-wrap: wrap; } .package-actions button { width: 100%; } }
 
 #brief-review, #brief-chooser { scroll-margin-top: 120px; }
+.request-status { position: sticky; top: 80px; z-index: 25; display: flex; align-items: center; gap: 16px; padding: 16px; margin: 16px 0; border: 1px solid #1865f2; border-radius: 12px; background: #fffefa; color: var(--ink); box-shadow: var(--shadow); }
+.request-status p { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+.request-status > div { flex: 1; }
+.confirmation-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(9,20,44,.55); display: grid; place-items: center; padding: 24px; }
+.confirmation-panel { max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.confirmation-panel p { margin: 24px 0; line-height: 1.6; }
+.confirmation-actions { display: flex; justify-content: flex-end; gap: 16px; flex-wrap: wrap; }
+.workspace-intro { font-size: 14px; line-height: 1.6; margin: 16px 0; white-space: normal; overflow: visible; overflow-wrap: anywhere; max-height: none; }
+.structure-status { margin: 16px 0; font-size: 14px; line-height: 1.5; }
+.arc-selector button[aria-pressed="true"] { border: 2px solid #1865f2; background: var(--blue-pale); }
+@media (max-width: 700px) { .request-status { flex-wrap: wrap; top: 64px; } .request-status button { width: 100%; } }
+
+#request-error { position: sticky; top: 80px; z-index: 25; }

@@ -11,7 +11,9 @@
     "check": "npm run build",
     "test": "node tests/server.mjs",
     "test:browser": "node tests/browser.mjs",
-    "test:selection": "node tests/brief-selection.mjs"
+    "test:selection": "node tests/brief-selection.mjs",
+    "test:reliability": "node tests/reliability.mjs",
+    "test:requests": "node tests/request.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",
