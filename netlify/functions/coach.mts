@@ -257,6 +257,9 @@ export default async function coach(req: Request, context: Context) {
       const deduped = removeDuplicateSections(normalizeGeneratedTypography(parsed));
       if (deduped.removed && !attempt) { repairIssues = ['Remove repeated labeled sections.']; continue; }
       if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = body.action === 'brief' && campaignTypeIssues(deduped.result).length ? campaignTypeIssues(deduped.result) : ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
+      if (body.action === 'content' && String(payload.deliverable || '').startsWith('Instagram ')) {
+        deduped.result.cta = deduped.result.primaryText.split('\n').map((line: string) => line.trim()).filter((line: string) => line && !line.startsWith('#')).at(-1);
+      }
       if (body.action === 'content' && payload.deliverable === 'Instagram Image Post' && repeatsCaption(deduped.result.frames[0].onScreen, deduped.result)) {
         deduped.result.frames[0].onScreen = '';
         deduped.result.creativeNotes = ['A repetitive image overlay was omitted. The image can carry the moment without extra text.'];

@@ -81,6 +81,10 @@ __responses.push({ ...narrativeDraft, frames: [{ ...narrativeDraft.frames[0], on
 response = await coach(request({ action: 'content', payload: narrativePayload, session }), context); output = await response.json();
 assert.equal(output.frames[0].onScreen, '', 'Literal repeated caption text is omitted before editorial review.');
 globalThis.__reviews = [{ issues: [], omitOverlay: false }];
+__responses.push({ ...narrativeDraft, cta: 'Register for volunteer training.' });
+response = await coach(request({ action: 'content', payload: narrativePayload, session }), context); output = await response.json();
+assert.equal(output.cta, 'Sign up for training.'); assert.deepEqual(output.copyReview.issues, [], 'Use the actual caption closing as CTA metadata rather than flagging equivalent wording.');
+globalThis.__reviews = [{ issues: [], omitOverlay: false }];
 __responses.push({ ...narrativeDraft, storyTrace: { ...narrativeDraft.storyTrace, turn: { sourceQuote: 'Maya signs up for the whole semester', captionQuote: 'she signs up for the semester.' } } });
 response = await coach(request({ action: 'content', payload: narrativePayload, session }), context); output = await response.json();
 assert.deepEqual(output.copyReview.issues, []); assert(output.sourceMappingIssues.length, 'Inexact AI quote metadata must not block an otherwise reviewed story.');
