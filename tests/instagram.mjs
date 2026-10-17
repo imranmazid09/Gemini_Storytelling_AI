@@ -33,6 +33,7 @@ try {
   assert.equal(await page.locator('.brief-card').count(), 6);
   await page.getByRole('button', { name: 'Choose Copperline Cold Brew', exact: true }).click();
   assert.equal(await page.getByLabel('Fictional client', { exact: true }).inputValue(), briefs[0].client);
+  assert(await page.getByLabel('Do (desired audience action)', { exact: true }).isVisible());
   await page.getByLabel('I have read this brief.').check();
   await page.getByRole('button', { name: 'Lock creative brief', exact: true }).click();
   for (const field of ['Setup', 'Tension', 'Resolution']) await page.getByLabel(field, { exact: true }).fill(field === 'Setup' ? 'A student pauses between classes with a notebook.' : field === 'Tension' ? 'They want a coffee break before the next class.' : 'They choose a can from the campus cooler.');
@@ -41,6 +42,8 @@ try {
   assert.equal(await page.getByText(/hook workshop/i).count(), 0);
   await page.getByRole('button', { name: 'Generate Instagram draft', exact: true }).click();
   await page.getByLabel('Caption', { exact: true }).waitFor();
+  assert(await page.getByLabel('Creative energy', { exact: true }).isVisible());
+  assert(await page.getByLabel('Image treatment', { exact: true }).isVisible());
   assert(await page.getByRole('button', { name: 'Approve and review submission', exact: true }).isDisabled());
   await page.getByRole('button', { name: 'Generate post image', exact: true }).click();
   await page.locator('.instagram-image img').waitFor();

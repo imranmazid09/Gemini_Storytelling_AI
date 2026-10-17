@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { briefText } from '../shared/brief.mjs';
-import { learningSummary } from './project';
+import { learningSummary } from './project.js';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const labels = { primaryText: 'Primary copy', cta: 'Call to action', visualDirection: 'Visual direction', altText: 'Alt text', ethicalCheck: 'Responsibility check', onScreenText: 'On-screen text', onScreen: 'On-screen copy', whyItWorks: 'Why it works', claimCheck: 'Claim check', storyReadiness: 'Story readiness', missingLink: 'Connection to establish', educatorSummary: 'Production summary' };
 export function readable(value, indent = '') {
@@ -10,7 +10,7 @@ export function readable(value, indent = '') {
 }
 export function outputText(project) {
   const { content, production } = project;
-  return [`STORYLAB PRO — INSTAGRAM PRODUCTION HANDOFF`, `Fictional classroom client: ${project.lockedBrief?.client}`, `Format: Instagram ${project.deliverable === 'video' ? 'video storyboard' : 'image post'}`, `Exported: ${new Date().toISOString()}`, '', 'CAPTION', content?.primaryText, '', 'HEADLINE', content?.headline, '', 'CALL TO ACTION', content?.cta, '', ...(content?.frames || []).flatMap((frame, index) => [`${project.deliverable === 'video' ? 'SCENE' : 'IMAGE'} ${index + 1}: ${frame.title}`, `Time: ${frame.time || 'Still image'}`, `Script: ${frame.copy}`, `Visual: ${frame.visual}`, `On-screen text: ${frame.onScreen || 'None'}`, `Sound: ${frame.audio || 'Not applicable'}`, `Alt text: ${project.assets?.[index]?.altText || frame.altText || content.altText}`, '']), 'PRODUCTION GUIDANCE', production?.summary, '', 'ACCESSIBILITY', production?.accessibility, '', 'CLAIM / RESPONSIBILITY CHECK', content?.ethicalCheck, '', 'LOCKED BRIEF', briefText(project.lockedBrief)].join('\n');
+  return [`STORYLAB PRO - INSTAGRAM PRODUCTION HANDOFF`, `Fictional classroom client: ${project.lockedBrief?.client}`, `Format: Instagram ${project.deliverable === 'video' ? 'video storyboard' : 'image post'}`, `Exported: ${new Date().toISOString()}`, '', 'CAPTION', content?.primaryText, '', 'HEADLINE', content?.headline, '', 'CALL TO ACTION', content?.cta, '', ...(content?.frames || []).flatMap((frame, index) => [`${project.deliverable === 'video' ? 'SCENE' : 'IMAGE'} ${index + 1}: ${frame.title}`, `Time: ${frame.time || 'Still image'}`, `Script: ${frame.copy}`, `Visual: ${frame.visual}`, `On-screen text: ${frame.onScreen || 'None'}`, `Sound: ${frame.audio || 'Not applicable'}`, `Alt text: ${project.assets?.[index]?.altText || frame.altText || content.altText}`, '']), 'PRODUCTION GUIDANCE', production?.summary, '', 'ACCESSIBILITY', production?.accessibility, '', 'CLAIM / RESPONSIBILITY CHECK', content?.ethicalCheck, '', 'LOCKED BRIEF', briefText(project.lockedBrief)].join('\n');
 }
 export function downloadFile(name, value, type) {
   const url = URL.createObjectURL(new Blob([value], { type }));

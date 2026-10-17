@@ -1,7 +1,7 @@
 import { missingBrief } from '../shared/brief.mjs';
 import { useEffect, useRef, useState } from 'react';
 export const STORAGE_KEY = 'storylab-project-v2';
-const instagramDefaults = { studioVersion: 1, assets: [], captionLength: '100', customLength: '', duration: '30', customDuration: '', sceneCount: '4', hashtags: false, emojis: false, profileName: '', username: '', location: '', timestamp: 'Just now', avatarId: '', showEngagement: false, likes: '0', exampleComment: '', overlayPosition: 'bottom' };
+const instagramDefaults = { studioVersion: 1, assets: [], creativeEnergy: 'Lively and relatable', visualStyle: 'candid', captionLength: '100', customLength: '', duration: '30', customDuration: '', sceneCount: '4', hashtags: false, emojis: false, profileName: '', username: '', location: '', timestamp: 'Just now', avatarId: '', showEngagement: false, likes: '0', exampleComment: '', overlayPosition: 'bottom' };
 export function freshProject() {
   return { version: 2, ...instagramDefaults, projectId: crypto.randomUUID(), startedAt: new Date().toISOString(), stage: 1, brief: null, lockedBrief: null, readBrief: false, arc: 'threeAct', arcDrafts: {}, feedback: null, storyLocked: false, deliverable: 'static', platform: 'Instagram', content: null, contentLocked: false, production: null, history: [], aiOutputs: [], receipts: [], session: null, reflection: '' };
 }
@@ -17,6 +17,7 @@ export function readProject() {
       if (project.feedback?.storyReadiness?.status === 'Ready for hooks') project.feedback = { ...project.feedback, storyReadiness: { ...project.feedback.storyReadiness, status: 'Ready for content' } };
       delete project.hookOptions; delete project.selectedHook; delete project.selectedHookPlan; delete project.hookTactic;
     }
+    project = { ...project, creativeEnergy: project.creativeEnergy || 'Lively and relatable', visualStyle: project.visualStyle || 'editorial' };
     return { project, error: '' };
   } catch {
     return { project: freshProject(), error: 'Your saved project could not be restored. The original save will be kept until you choose New project. Downloads remain available.' };

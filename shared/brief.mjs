@@ -2,7 +2,7 @@ export const BRIEF_FIELDS = {
   cardIndustry: 'Industry', cardObjective: 'Campaign type', client: 'Fictional client',
   background: 'Background', audience: 'Audience', objective: 'Advertising objective',
   singleMessage: 'Single message', reasonToBelieve: 'Reason to believe / supplied scenario facts',
-  'thinkFeelDo.think': 'Think', 'thinkFeelDo.feel': 'Feel', 'thinkFeelDo.do': 'Do',
+  'thinkFeelDo.think': 'Think', 'thinkFeelDo.feel': 'Feel', 'thinkFeelDo.do': 'Do (desired audience action)',
   tone: 'Tone', mandatory: 'Mandatory detail', constraints: 'Constraints', deliverable: 'Deliverable',
 };
 export const getField = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);

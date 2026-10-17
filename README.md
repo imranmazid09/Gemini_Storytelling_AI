@@ -123,6 +123,12 @@ unlock and every structure selector, including browsers without native dialogs o
 
 `copy-engine/v1.json` versions the prompt, safe examples, banned language and Instagram format guidance.
 Content develops directly from the approved story and preserves mandatory details and constraints.
+Version 2.1 adds creative-energy and image-treatment choices, story-moment/turn source mapping,
+and narrative examples instead of benefit-list captions. Source mapping supports review; it does
+not certify semantic quality, authorship or learning. Existing drafts are preserved until replaced.
+Generated images undergo a multimodal constraint review with at most one retry. Readable prop
+text, fabricated records and prohibited child faces are rejected, but students must still inspect
+every image. Overlays are added separately and remain editable.
 Checks cover caption settings and consecutive scene timing. One repair attempt names failed checks;
 the best complete draft is retained with any remaining issues for student editing. These checks support
 review, not grading or factual certification. Copy-engine versions remain in the learning record.

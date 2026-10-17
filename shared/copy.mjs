@@ -41,14 +41,12 @@ export function copyIssues(result, payload) {
   const lines = caption.replace(/\r/g, '').split('\n');
   const creative = [caption, result.headline, result.cta, ...(result.frames || []).flatMap(frame => [frame.copy, frame.onScreen])].filter(Boolean).join('\n');
   for (const phrase of config.bannedPhrases) if (new RegExp(`\\b${escape(normalize(phrase))}\\b`, 'i').test(normalize(creative))) issues.push(`Remove the banned phrase: ${phrase}.`);
-  if (/\bfrom\s+\S+(?:\s+\S+){0,3}\s+to\b/i.test(creative)) issues.push('Avoid generic from-X-to-Y framing.');
   const cta = String(result.cta || '').trim();
   if (!cta || /^learn more\b/i.test(cta)) issues.push('Use one specific call to action.');
   if (cta && /^link in bio|^tickets? in bio/i.test(cta)) issues.push('Name the specific action that serves the objective, not only the link location.');
   const captionLines = lines.filter(line => line.trim() && !/^\s*#/.test(line));
   if (cta && normalize(captionLines.at(-1)).replace(/[.!?]+$/, '') !== normalize(cta).replace(/[.!?]+$/, '')) issues.push('End the caption with the CTA, with no extra requests.');
   if (cta && normalize(caption).split(normalize(cta)).length - 1 > 1) issues.push('Do not repeat the CTA within the caption.');
-  if (caption.split(/\n\s*\n/).some(paragraph => paragraph.trim().split('\n').length > 2)) issues.push('Use blocks of no more than two written lines, separated by blank lines.');
   const brief = briefFields(payload);
   const source = [payload.brief, JSON.stringify(brief), payload.story].join(' ');
   const narrativeSource = normalize([brief.background, brief.audience, brief.reasonToBelieve, payload.story].join(' '));

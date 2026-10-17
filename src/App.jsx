@@ -205,7 +205,7 @@ function App() {
     if (busy.current) return;
     if (content && !await askConfirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
     run('content', async signal => {
-      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform: 'Instagram', length: lengthFor(project), duration: Number(project.duration === 'Other' ? project.customDuration : project.duration), sceneCount: Number(project.sceneCount), hashtags: project.hashtags, emojis: project.emojis }, signal);
+      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform: 'Instagram', creativeEnergy: project.creativeEnergy, visualStyle: project.visualStyle, length: lengthFor(project), duration: Number(project.duration === 'Other' ? project.customDuration : project.duration), sceneCount: Number(project.sceneCount), hashtags: project.hashtags, emojis: project.emojis }, signal);
       update({ content: result, contentLocked: false, production: null, assets: [] }); record('Content draft loaded', `Instagram ${deliverable}`);
     });
   };
@@ -227,10 +227,10 @@ function App() {
     update({ production: result }); record('Production package created', 'Exact copy, frame / shot directions, audio and accessibility handoff.');
   });
   const updateSettings = async (field, value) => {
-    const resets = ['deliverable', 'captionLength', 'customLength', 'duration', 'customDuration', 'sceneCount', 'hashtags', 'emojis'].includes(field);
+    const resets = ['deliverable', 'captionLength', 'customLength', 'duration', 'customDuration', 'sceneCount', 'hashtags', 'emojis', 'creativeEnergy'].includes(field);
     if (content && resets && !await askConfirm('Change content settings? This clears the current draft and images. Your revisions remain in the learning record.')) return;
     cancelPending();
-    update(previous => ({ ...edit(previous, `Instagram settings: ${field}`, previous[field], value), [field]: value, ...(resets ? { content: null, assets: [], contentLocked: false, production: null } : {}) }));
+    update(previous => ({ ...edit(previous, `Instagram settings: ${field}`, previous[field], value), [field]: value, ...(field === 'visualStyle' ? { contentLocked: false, production: null } : {}), ...(resets ? { content: null, assets: [], contentLocked: false, production: null } : {}) }));
   };
   const editAsset = (index, field, value) => {
     cancelPending();
@@ -243,13 +243,13 @@ function App() {
     setMedia(previous => ({ ...previous, [id]: dataUrl }));
     update(previous => {
       const assets = [...(previous.assets || [])];
-      assets[index] = { ...assets[index], id, source, altText: assets[index]?.altText || previous.content?.frames[index]?.altText || previous.content?.altText || '', prompt: previous.content?.frames[index]?.visual || '' };
+      assets[index] = { ...assets[index], id, source, visualStyle: previous.visualStyle || 'editorial', altText: assets[index]?.altText || previous.content?.frames[index]?.altText || previous.content?.altText || '', prompt: previous.content?.frames[index]?.visual || '' };
       return addEvent({ ...previous, assets, contentLocked: false, production: null }, 'Image added', `${source} image for ${deliverable === 'video' ? 'scene' : 'post'} ${index + 1}.`);
     });
   };
   const generateImage = index => run('image', async signal => {
     const frame = content.frames[index];
-    const result = await requestCoach('image', { prompt: frame.visual, context: arcText, brief: briefText(lockedBrief), frame: index + 1, aspectRatio: deliverable === 'video' ? '9:16' : '1:1' }, signal);
+    const result = await requestCoach('image', { prompt: frame.visual, visualStyle: project.visualStyle, context: arcText, brief: briefText(lockedBrief), frame: index + 1, aspectRatio: deliverable === 'video' ? '9:16' : '1:1' }, signal);
     if (signal.aborted) return;
     await storeImage(index, result.dataUrl, 'AI-generated', signal);
   });

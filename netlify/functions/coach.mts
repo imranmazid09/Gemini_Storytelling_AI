@@ -1,6 +1,7 @@
 import type { Config, Context } from "@netlify/functions";
 import copyEngine from '../../copy-engine/v1.json' with { type: 'json' };
 import { copyTask, copyIssues } from '../../shared/copy.mjs';
+import { campaignTypeIssues, narrativeIssues, imagePrompt, normalizeGeneratedTypography } from '../../shared/creative.mjs';
 import { GoogleGenAI } from "@google/genai";
 import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
 import { removeDuplicateSections } from "../../shared/response.mjs";
@@ -29,7 +30,7 @@ function validateResult(action: Action, result: Record<string, any>, payload: Re
   const fields = (object: any, keys: string[]) => object && keys.every(key => text(object[key]));
   if (action === "brief") return text(result.id) && missingBrief(result).length === 0 && result.aiGenerated === true &&
     ['Instagram static post', 'Instagram carousel', 'Short video', 'Paid ad'].includes(result.deliverable) && result.reasonToBelieve.startsWith('Supplied fictional scenario facts:') &&
-    result.client.toLowerCase() !== String(payload.previousClient || "").toLowerCase() &&
+    result.client.toLowerCase() !== String(payload.previousClient || "").toLowerCase() && campaignTypeIssues(result).length === 0 &&
     !Object.keys(BRIEF_FIELDS).some(key => /^(tbd|n\/a)$/i.test(String(key.includes('.') ? result.thinkFeelDo?.[key.split('.')[1]] : result[key]).trim()));
   if (action === "feedback") return fields(result.alignment, ['status', 'summary']) &&
     ['Aligned', 'Needs connection', 'Off brief'].includes(result.alignment.status) &&
@@ -69,7 +70,7 @@ do not impose advocacy standards on ordinary brand work. Return only valid JSON.
     case "brief":
       return {
         systemInstruction: `${shared}
-Invent a fictional client with a different name from previousClient. Prefer an industry other than Food and Beverage, Retail, Technology, Local Services, Entertainment or Nonprofit. Fill every field; no empty fields or TBD. Use plain language readable in under two minutes. singleMessage is one single-minded plain-language advertising message. mandatory names a concrete place, date or action. reasonToBelieve must begin "Supplied fictional scenario facts:". Include only modest concrete scenario facts; no statistics, performance promises, superlatives or unverified comparisons. constraints explicitly name prohibited claims and creative choices. deliverable must be exactly Instagram static post, Instagram carousel, Short video or Paid ad. cardIndustry and cardObjective are short menu labels.`,
+Invent a fictional client with a different name from previousClient. Prefer an industry other than Food and Beverage, Retail, Technology, Local Services, Entertainment or Nonprofit. Fill every field; no empty fields or TBD. Use plain language readable in under two minutes. singleMessage is one single-minded plain-language advertising message. mandatory names a concrete place, date or action. reasonToBelieve must begin "Supplied fictional scenario facts:". Include only modest concrete scenario facts; no statistics, performance promises, superlatives or unverified comparisons. constraints explicitly name prohibited claims and creative choices. deliverable must be exactly Instagram static post, Instagram carousel, Short video or Paid ad. cardIndustry names the sector. cardObjective MUST name the campaign's communication task: e.g. Volunteer Recruitment, Fundraising, Program Participation, Product Launch, Ticket Sales, Public Education or Brand Awareness. Never put Commercial Brand, Nonprofit or another organization category in cardObjective. For a nonprofit recruiting volunteers, use Volunteer Recruitment. Fill thinkFeelDo.do with the precise action the audience should take. Do not use em dashes.`,
         prompt: `Create one complete fictional advertising brief. ${context}
 Return only this JSON shape with every string filled:
 {"id":"unique fictional client slug","cardIndustry":"industry","cardObjective":"campaign type","client":"fictional client name","background":"context","audience":"specific audience","objective":"advertising objective","singleMessage":"one message","reasonToBelieve":"Supplied fictional scenario facts: ...","thinkFeelDo":{"think":"thought","feel":"feeling","do":"action"},"tone":"tone","mandatory":"concrete required detail","constraints":"what is off limits","deliverable":"Instagram static post","aiGenerated":true}`,
@@ -137,9 +138,10 @@ Return JSON exactly shaped as:
 ${copyEngine.systemPrompt}
 Banned phrases: ${copyEngine.bannedPhrases.join(", ")}.
 Format guidance: ${copyEngine.formats[String(payload.deliverable) as keyof typeof copyEngine.formats] || copyEngine.formats["Instagram Image Post"]}
-Approved examples (use only when the client/story facts match): ${JSON.stringify(copyEngine.examples)}
+Craft examples (sourceStory is an example only; never borrow its events or names when absent from this student's story): ${JSON.stringify(copyEngine.examples)}
 Translate the student's approved story directly into the selected Instagram format. The creative brief is unchanged; the selected studio format determines this output. Apply campaign-mode standards. Preserve approved facts, mandatory details and the CTA without embellishment. Do not invent student rationale.
-For Instagram Image Post, return exactly one still-image frame. No video motion, shot sequence, timestamps or audio. Caption length must be no more than the requested word limit. Text overlay is optional and concise, at most 16 words.
+Before drafting, identify this story's specific situation, pressure and change. Keep those in the caption itself. Do not reduce a character's experience to a list of program benefits or an inventory of props. Prioritize the actual narrative over the sample wording. Preserve the student's supplied third-person fictional events without presenting them as a real testimonial. The requested creative energy is ${payload.creativeEnergy || 'Lively and relatable'}; fit it to the brief's tone and context, without making serious situations frivolous.
+For Instagram Image Post, return exactly one still-image frame centered on a decisive action or surprising juxtaposition grounded in the story. Describe viewpoint, subject action, composition and focal point. No video motion, shot sequence, timestamps or audio. Caption length must be no more than the requested word limit. Optional text overlay is at most 8 words; leave it empty if the image already communicates the moment. Do not default to the mandatory logistics or an oversized recruitment banner on the image. Image treatment: ${payload.visualStyle || 'candid'}. Put all required factual details in the caption even when the overlay is empty.
 For Instagram Video Storyboard, return exactly the requested sceneCount. Every scene has title, copy (the exact script or voiceover), visual (concrete action and image direction), time (consecutive start-end seconds), audio (sound direction), onScreen (optional text) and altText. The last scene ends at duration seconds. Keep speech feasible at about 2 words per second or fewer. This is a production plan, not a rendered video.
 When hashtags is false, do not add hashtags. When true, add a few relevant hashtags after the CTA on a separate line. Include emojis only when emojis is true. Never invent engagement statistics.`,
         prompt: `${copyTask(payload)}
@@ -153,7 +155,8 @@ Return JSON shaped as:
   "visualDirection": "respectful visual concept",
   "altText": "accessible alt text for the primary visual",
   "ethicalCheck": "one responsibility or claim check",
-  "frames": [{"title": "image or scene title", "copy": "short image message or exact scene script", "visual": "still image direction or scene action", "time": "Image 1 for a still; consecutive start-end seconds for video", "audio": "Not applicable for still; sound direction for video", "onScreen": "optional exact text overlay or empty string", "altText": "image description"}]
+  "frames": [{"title": "image or scene title", "copy": "short image message or exact scene script", "visual": "still image direction or scene action", "time": "Image 1 for a still; consecutive start-end seconds for video", "audio": "Not applicable for still; sound direction for video", "onScreen": "optional exact text overlay or empty string", "altText": "image description"}],
+  "storyTrace": {"moment": {"sourceQuote": "exact quote of at least four words from the student story's situation or pressure", "captionQuote": "exact passage of at least four words from your caption carrying that situation"}, "turn": {"sourceQuote": "exact quote of at least four words from the student's change or choice", "captionQuote": "distinct exact passage of at least four words from your caption carrying that change"}}
 }.`,
       };
     case "production":
@@ -212,11 +215,21 @@ export default async function coach(req: Request, context: Context) {
       if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return response({ error: 'An approved image direction is required.' }, 400);
       const configuredModel = Netlify.env.get('GEMINI_IMAGE_MODEL');
       const imageModel = configuredModel && !configuredModel.startsWith('imagen-') ? configuredModel : 'gemini-3.1-flash-image';
-      const generated = await ai.models.generateContent({ model: imageModel, contents: `Create a polished editorial illustration for a fictional classroom Instagram project. Keep character design and palette consistent with the supplied story. Use only this approved scene: ${payload.prompt}. Context: ${payload.context || ''}. Brief constraints: ${payload.brief || ''}. No printed words, lettering, logos, watermarks, unsupported proof demonstrations or invented claims. The application adds text separately.`, config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
-      const image = generated.candidates?.flatMap(candidate => candidate.content?.parts || []).find(part => part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
-      if (!image?.data) return response({ error: 'The image could not be generated. Revise its direction or upload an image.' }, 422);
-      if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.' }, 413);
-      output = { dataUrl: `data:${image.mimeType};base64,${image.data}`, source: 'AI-generated', model: imageModel, imageHash: hash(image.data) };
+      let imageProblems = '';
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const generated = await ai.models.generateContent({ model: imageModel, contents: imagePrompt(payload) + (imageProblems ? `\nPrevious attempt failed review: ${imageProblems}. Use a simpler composition and completely blank surfaces.` : ''), config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
+        const image = generated.candidates?.flatMap(candidate => candidate.content?.parts || []).find(part => part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
+        if (!image?.data) return response({ error: 'The image could not be generated. Revise its direction or upload an image.' }, 422);
+        if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.' }, 413);
+        const review = await ai.models.generateContent({ model, contents: [{ role: 'user', parts: [{ text: `Review this generated classroom campaign image against the approved direction and constraints. Direction: ${payload.prompt}. Story: ${payload.context || ''}. Brief: ${payload.brief || ''}. Fail if there are readable words or numbers on props, fabricated journals/training records/dates/named beneficiaries, unsupported claims, or child faces when prohibited. Abstract unrecognizable marks are acceptable. Also fail if it substitutes a static unrelated desk flat lay for an approved action or ignores the selected treatment ${payload.visualStyle || 'candid'}. Do not invent violations. Return JSON: {"usable":true,"issues":[]} with short specific issues when false.` }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }], config: { responseMimeType: 'application/json', temperature: 0.1 } });
+        const imageReview = JSON.parse(cleanJson(review.text || '{}'));
+        if (imageReview.usable === true && Array.isArray(imageReview.issues) && !imageReview.issues.length) {
+          output = { dataUrl: `data:${image.mimeType};base64,${image.data}`, source: 'AI-generated', model: imageModel, imageHash: hash(image.data), imageReview: { checked: true, issues: [] } };
+          break;
+        }
+        imageProblems = Array.isArray(imageReview.issues) ? imageReview.issues.join('; ') : 'Image review could not confirm the constraints.';
+      }
+      if (!output) return response({ error: 'The generated image still contains unwanted text or misses the approved direction. Try a simpler visual direction, another treatment, or upload an image.' }, 422);
     }
     let cleanup = 0;
     let repairIssues: string[] = [];
@@ -230,10 +243,10 @@ export default async function coach(req: Request, context: Context) {
       });
       let parsed;
       try { parsed = JSON.parse(cleanJson(result.text || "")); } catch { if (!attempt) continue; if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Invalid JSON'); }
-      const deduped = removeDuplicateSections(parsed);
+      const deduped = removeDuplicateSections(normalizeGeneratedTypography(parsed));
       if (deduped.removed && !attempt) { repairIssues = ['Remove repeated labeled sections.']; continue; }
-      if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
-      const issues = body.action === 'content' ? copyIssues(deduped.result, payload) : [];
+      if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = body.action === 'brief' && campaignTypeIssues(deduped.result).length ? campaignTypeIssues(deduped.result) : ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
+      const issues = body.action === 'content' ? [...copyIssues(deduped.result, payload), ...narrativeIssues(deduped.result, payload)] : [];
       if (body.action === 'content' && (!bestCopy || issues.length < bestCopy.issues.length)) bestCopy = { draft: deduped.result, issues, cleanup: deduped.removed };
       if (issues.length && !attempt) { repairIssues = issues; previousDraft = JSON.stringify(deduped.result); continue; }
       output = { ...deduped.result, ...(body.action === 'content' ? { aiGenerated: true, copyEngineVersion: copyEngine.version } : {}) };
