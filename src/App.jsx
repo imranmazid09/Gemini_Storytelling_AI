@@ -6,6 +6,7 @@ import { downloadFile, makeReport, outputText, reportHtml, recordDigest } from '
 import Verification from './Verification';
 import { fetchJSON, requestFailure } from './request';
 import { COPY_ENGINE_VERSION, copyIssues } from '../shared/copy.mjs';
+import { presentationIssues } from '../shared/creative.mjs';
 import { InstagramStudio, InstagramReview, FORMATS, lengthFor, assetsComplete } from './InstagramStudio';
 import { readMedia, saveMedia, prepareUpload } from './media';
 import { submissionZip } from './submission';
@@ -134,7 +135,7 @@ function App() {
       if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
       setVerificationWarning('Server verification is unavailable. You can keep working and download a local record. AI calls without receipts cannot be verified later.');
     }
-    const result = await fetchJSON('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload, session }) }, { signal, timeout: action === 'image' ? 55000 : 40000 });
+    const result = await fetchJSON('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload, session }) }, { signal, timeout: action === 'image' ? 55000 : action === 'content' ? 65000 : 40000 });
     if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
     const { _receipt, _cleanup, _receiptWarning, ...output } = result;
     if (_receiptWarning) setVerificationWarning(_receiptWarning);
@@ -151,7 +152,7 @@ function App() {
     const controller = new AbortController();
     activeRequest.current = { name, controller };
     busy.current = true; setLoading(name); setError(''); setRetryAction('');
-    const deadline = setTimeout(() => controller.abort(requestFailure('The request took too long. Your work is safe; try again.', 'TimeoutError')), name === 'image' ? 60000 : 45000);
+    const deadline = setTimeout(() => controller.abort(requestFailure('The request took too long. Your work is safe; try again.', 'TimeoutError')), name === 'image' ? 60000 : name === 'content' ? 70000 : 45000);
     let onAbort;
     const canceled = new Promise((_, reject) => {
       onAbort = () => reject(controller.signal.reason || requestFailure('Request canceled.', 'AbortError'));
@@ -212,7 +213,8 @@ function App() {
   const updateContent = next => { cancelPending('Request canceled because the content changed. Try again with the updated content.'); update(previous => {
     let changed = previous;
     for (const field of Object.keys(next)) if (JSON.stringify(next[field]) !== JSON.stringify(previous.content?.[field])) changed = edit(changed, `Content: ${field}`, previous.content?.[field], next[field]);
-    const reviewed = { ...next, copyReview: { version: next.copyEngineVersion || COPY_ENGINE_VERSION, issues: copyIssues(next, { briefFields: previous.lockedBrief, brief: briefText(previous.lockedBrief), story: arcText, deliverable: DELIVERABLES.find(item => item.id === previous.deliverable)?.name, length: lengthFor(previous), duration: Number(previous.duration === 'Other' ? previous.customDuration : previous.duration), sceneCount: Number(previous.sceneCount), hashtags: previous.hashtags, emojis: previous.emojis }) } };
+    const reviewPayload = { briefFields: previous.lockedBrief, brief: briefText(previous.lockedBrief), story: arcText, deliverable: DELIVERABLES.find(item => item.id === previous.deliverable)?.name, length: lengthFor(previous), duration: Number(previous.duration === 'Other' ? previous.customDuration : previous.duration), sceneCount: Number(previous.sceneCount), hashtags: previous.hashtags, emojis: previous.emojis };
+    const reviewed = { ...next, copyReview: { version: next.copyEngineVersion || COPY_ENGINE_VERSION, issues: [...copyIssues(next, reviewPayload), ...presentationIssues(next, reviewPayload)] } };
     return { ...changed, content: reviewed, contentLocked: false, production: null };
   }); };
   const lockContent = () => {

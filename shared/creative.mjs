@@ -1,4 +1,27 @@
 const compact = text => String(text || '').replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').toLowerCase().trim();
+const words = text => compact(text).replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, ' ').trim();
+
+export function repeatsCaption(text, result) {
+  const overlay = words(text);
+  if (!overlay) return false;
+  const repeatedLine = String(result.primaryText || '').split('\n').some(line => words(line) === overlay);
+  return (overlay.split(' ').length >= 3 && (' ' + words(result.primaryText) + ' ').includes(' ' + overlay + ' ')) || repeatedLine || overlay === words(result.cta);
+}
+
+export function presentationIssues(result, payload) {
+  if (!String(payload.deliverable || '').startsWith('Instagram ')) return [];
+  const issues = [];
+  const opening = String(result.primaryText || '').trim().split('\n')[0];
+  if ([...opening].length > 80) issues.push('Make line 1 a standalone attention-grabbing opening of at most 80 characters; develop the moment on the following lines.');
+  if (payload.deliverable !== 'Instagram Image Post') return issues;
+  for (const frame of result.frames || []) {
+    const overlay = words(frame.onScreen);
+    if (!overlay) continue;
+    if (overlay.split(' ').length > 5) issues.push('Keep the optional image overlay to five words or fewer.');
+    if (repeatsCaption(frame.onScreen, result)) issues.push('The image overlay repeats caption wording. Add a complementary thought or leave it empty.');
+  }
+  return [...new Set(issues)];
+}
 
 export function campaignTypeIssues(brief) {
   return /^(commercial brand|nonprofit|non-profit|for-profit(?: brand)?|advocacy(?: organization)?|public service|social enterprise)$/i.test(String(brief.cardObjective || '').trim())

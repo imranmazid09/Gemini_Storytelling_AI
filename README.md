@@ -110,7 +110,8 @@ smoke test after deploying with the existing server-side environment variables.
 ### Request recovery and browser compatibility
 
 AI requests show a spinner/action label and a sticky status with Cancel request. The entire workspace is
-not disabled. The overall deadline is 45 seconds, using regular timers and AbortController rather than
+not disabled. Browser deadlines are 45 seconds for coaching, 60 seconds for images and 70 seconds for
+content with editorial review, using regular timers and AbortController rather than
 AbortSignal.timeout. Failed requests show a plain-language error and Try again. Draft edits cancel
 older requests. Reset and unlock use accessible in-page confirmation dialogs; confirming either
 can abort pending work. Late responses cannot overwrite a canceled or reset project.
@@ -123,7 +124,20 @@ unlock and every structure selector, including browsers without native dialogs o
 
 `copy-engine/v1.json` versions the prompt, safe examples, banned language and Instagram format guidance.
 Content develops directly from the approved story and preserves mandatory details and constraints.
-Version 2.1 adds creative-energy and image-treatment choices, story-moment/turn source mapping,
+Version 2.2 keeps the existing studio and adds a standalone attention-grabbing opening, a
+five-word optional complementary overlay, and an editorial review of the actual caption/image
+pair, not just matching source words. The review checks story carry-through, account-swap
+genericness, invented details and repetitive overlays. One targeted repair is allowed; unresolved
+issues or unavailable editorial review leave an editable, flagged draft. Students still make the
+creative judgment, supported by a short optional self-check in the editor. Content generation has
+a longer browser deadline to accommodate this review; cancellation remains available.
+Repetitive optional image overlays are omitted with an explanatory note, rather than passing
+duplicate text along to the student. Students can add and edit a complementary overlay themselves.
+The server bounds content generation, review and repair to a shared 50-second model-call budget,
+retaining a complete flagged draft if repair fails or times out.
+Source-quote mapping errors are retained as diagnostic metadata, not a submission gate:
+editorial review compares the actual caption and image direction with the approved story.
+Version 2.1 added creative-energy and image-treatment choices, story-moment/turn source mapping,
 and narrative examples instead of benefit-list captions. Source mapping supports review; it does
 not certify semantic quality, authorship or learning. Existing drafts are preserved until replaced.
 Generated images undergo a multimodal constraint review with at most one retry. Readable prop
@@ -149,3 +163,5 @@ an image instead. Uploaded PNG, JPEG and WebP files are resized locally before s
 Run `npm run test:browser` with Playwright and an installed Chrome browser for both output paths,
 image reload recovery, custom duration/length, PNG exports, ZIP contents and narrow-screen checks.
 `node tests/live-preview.mjs` is an opt-in live text and image smoke test and consumes provider usage.
+`node tests/storytelling-live.mjs` checks live captions and image concepts against six explicitly
+fictional test stories. It does not render all six images or substitute AI review for human judgment.

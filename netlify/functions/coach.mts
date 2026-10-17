@@ -1,8 +1,8 @@
 import type { Config, Context } from "@netlify/functions";
 import copyEngine from '../../copy-engine/v1.json' with { type: 'json' };
 import { copyTask, copyIssues } from '../../shared/copy.mjs';
-import { campaignTypeIssues, narrativeIssues, imagePrompt, normalizeGeneratedTypography } from '../../shared/creative.mjs';
-import { GoogleGenAI } from "@google/genai";
+import { campaignTypeIssues, narrativeIssues, presentationIssues, repeatsCaption, imagePrompt, normalizeGeneratedTypography } from '../../shared/creative.mjs';
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
 import { removeDuplicateSections } from "../../shared/response.mjs";
 import { hash, token, records, validSession } from "../lib/records.mts";
@@ -139,9 +139,10 @@ ${copyEngine.systemPrompt}
 Banned phrases: ${copyEngine.bannedPhrases.join(", ")}.
 Format guidance: ${copyEngine.formats[String(payload.deliverable) as keyof typeof copyEngine.formats] || copyEngine.formats["Instagram Image Post"]}
 Craft examples (sourceStory is an example only; never borrow its events or names when absent from this student's story): ${JSON.stringify(copyEngine.examples)}
+Opening approaches, used inside the caption generation, not a separate workshop: ${JSON.stringify(copyEngine.openingApproaches)}
 Translate the student's approved story directly into the selected Instagram format. The creative brief is unchanged; the selected studio format determines this output. Apply campaign-mode standards. Preserve approved facts, mandatory details and the CTA without embellishment. Do not invent student rationale.
 Before drafting, identify this story's specific situation, pressure and change. Keep those in the caption itself. Do not reduce a character's experience to a list of program benefits or an inventory of props. Prioritize the actual narrative over the sample wording. Preserve the student's supplied third-person fictional events without presenting them as a real testimonial. The requested creative energy is ${payload.creativeEnergy || 'Lively and relatable'}; fit it to the brief's tone and context, without making serious situations frivolous.
-For Instagram Image Post, return exactly one still-image frame centered on a decisive action or surprising juxtaposition grounded in the story. Describe viewpoint, subject action, composition and focal point. No video motion, shot sequence, timestamps or audio. Caption length must be no more than the requested word limit. Optional text overlay is at most 8 words; leave it empty if the image already communicates the moment. Do not default to the mandatory logistics or an oversized recruitment banner on the image. Image treatment: ${payload.visualStyle || 'candid'}. Put all required factual details in the caption even when the overlay is empty.
+For Instagram Image Post, return exactly one still-image frame centered on a decisive action or surprising juxtaposition grounded in the story. Describe viewpoint, subject action, composition and focal point. No video motion, shot sequence, timestamps or audio. Caption length must be no more than the requested word limit. Optional text overlay is at most 5 words and must add a different thought, not repeat or paraphrase the caption or CTA; leave it empty if it adds nothing. Do not default to the mandatory logistics or an oversized recruitment banner on the image. Image treatment: ${payload.visualStyle || 'candid'}. Put all required factual details in the caption even when the overlay is empty.
 For Instagram Video Storyboard, return exactly the requested sceneCount. Every scene has title, copy (the exact script or voiceover), visual (concrete action and image direction), time (consecutive start-end seconds), audio (sound direction), onScreen (optional text) and altText. The last scene ends at duration seconds. Keep speech feasible at about 2 words per second or fewer. This is a production plan, not a rendered video.
 When hashtags is false, do not add hashtags. When true, add a few relevant hashtags after the CTA on a separate line. Include emojis only when emojis is true. Never invent engagement statistics.`,
         prompt: `${copyTask(payload)}
@@ -149,14 +150,13 @@ Create an editable social content draft.
 ${context}
 Return JSON shaped as:
 {
-  "primaryText": "caption, primary copy, or brief script",
+  "primaryText": "standalone attention-grabbing opening line of at most 80 characters, then a line break, the story moment and turn, required details and one final CTA",
   "headline": "short headline",
   "cta": "appropriate CTA",
   "visualDirection": "respectful visual concept",
   "altText": "accessible alt text for the primary visual",
   "ethicalCheck": "one responsibility or claim check",
-  "frames": [{"title": "image or scene title", "copy": "short image message or exact scene script", "visual": "still image direction or scene action", "time": "Image 1 for a still; consecutive start-end seconds for video", "audio": "Not applicable for still; sound direction for video", "onScreen": "optional exact text overlay or empty string", "altText": "image description"}],
-  "storyTrace": {"moment": {"sourceQuote": "exact quote of at least four words from the student story's situation or pressure", "captionQuote": "exact passage of at least four words from your caption carrying that situation"}, "turn": {"sourceQuote": "exact quote of at least four words from the student's change or choice", "captionQuote": "distinct exact passage of at least four words from your caption carrying that change"}}
+  "frames": [{"title": "image or scene title", "copy": "short image message or exact scene script", "visual": "still image direction or scene action", "time": "Image 1 for a still; consecutive start-end seconds for video", "audio": "Not applicable for still; sound direction for video", "onScreen": "optional exact text overlay or empty string", "altText": "image description"}]
 }.`,
       };
     case "production":
@@ -235,18 +235,56 @@ export default async function coach(req: Request, context: Context) {
     let repairIssues: string[] = [];
     let previousDraft = "";
     let bestCopy: { draft: Record<string, any>; issues: string[]; cleanup: number } | undefined;
+    const contentDeadline = Date.now() + 50000;
+    const remaining = () => Math.max(1, contentDeadline - Date.now());
     for (let attempt = 0; !output && attempt < 2; attempt++) {
-      const result = await ai.models.generateContent({
-        model,
-        contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
-        config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json" },
-      });
+      let result;
+      try {
+        const contentSignal = body.action === 'content' ? AbortSignal.timeout(remaining()) : undefined;
+        result = await ai.models.generateContent({
+          model,
+          contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
+          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}) },
+        });
+      } catch (error) {
+        if (!bestCopy) throw error;
+        output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } };
+        cleanup = bestCopy.cleanup;
+        break;
+      }
       let parsed;
       try { parsed = JSON.parse(cleanJson(result.text || "")); } catch { if (!attempt) continue; if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Invalid JSON'); }
       const deduped = removeDuplicateSections(normalizeGeneratedTypography(parsed));
       if (deduped.removed && !attempt) { repairIssues = ['Remove repeated labeled sections.']; continue; }
       if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = body.action === 'brief' && campaignTypeIssues(deduped.result).length ? campaignTypeIssues(deduped.result) : ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
-      const issues = body.action === 'content' ? [...copyIssues(deduped.result, payload), ...narrativeIssues(deduped.result, payload)] : [];
+      if (body.action === 'content' && payload.deliverable === 'Instagram Image Post' && repeatsCaption(deduped.result.frames[0].onScreen, deduped.result)) {
+        deduped.result.frames[0].onScreen = '';
+        deduped.result.creativeNotes = ['A repetitive image overlay was omitted. The image can carry the moment without extra text.'];
+      }
+      const issues = body.action === 'content' ? [...copyIssues(deduped.result, payload), ...presentationIssues(deduped.result, payload)] : [];
+      if (body.action === 'content' && deduped.result.storyTrace) {
+        const mappingIssues = narrativeIssues(deduped.result, payload);
+        if (mappingIssues.length) deduped.result.sourceMappingIssues = mappingIssues;
+      }
+      // Literal source matches cannot tell whether a draft actually carries the story.
+      if (body.action === 'content' && !issues.length && String(payload.deliverable || '').startsWith('Instagram ')) {
+        try {
+          const review = await ai.models.generateContent({
+            model,
+            contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, format: payload.deliverable, creativeEnergy: payload.creativeEnergy, candidate: deduped.result }),
+            config: { systemInstruction: copyEngine.editorialReview, temperature: 0.1, responseMimeType: 'application/json', abortSignal: AbortSignal.timeout(remaining()), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}), responseJsonSchema: { type: 'object', properties: { issues: { type: 'array', items: { type: 'string' }, maxItems: 4 }, omitOverlay: { type: 'boolean' } }, required: ['issues', 'omitOverlay'], additionalProperties: false } },
+          });
+          const checked = JSON.parse(cleanJson(review.text || '{}'));
+          if (!Array.isArray(checked.issues) || checked.issues.some((issue: unknown) => typeof issue !== 'string' || !issue.trim())) throw new Error('Invalid editorial review');
+          if (payload.deliverable === 'Instagram Image Post' && checked.omitOverlay === true) {
+            deduped.result.frames[0].onScreen = '';
+            deduped.result.creativeNotes = ['A repetitive image overlay was omitted. The image can carry the moment without extra text.'];
+          }
+          issues.push(...checked.issues.slice(0, 4).map((issue: string) => normalizeGeneratedTypography(issue)));
+        } catch {
+          issues.push('The AI storytelling check could not finish. Review the opening, story moment, image and overlay yourself before approval.');
+        }
+      }
       if (body.action === 'content' && (!bestCopy || issues.length < bestCopy.issues.length)) bestCopy = { draft: deduped.result, issues, cleanup: deduped.removed };
       if (issues.length && !attempt) { repairIssues = issues; previousDraft = JSON.stringify(deduped.result); continue; }
       output = { ...deduped.result, ...(body.action === 'content' ? { aiGenerated: true, copyEngineVersion: copyEngine.version } : {}) };
@@ -269,7 +307,8 @@ export default async function coach(req: Request, context: Context) {
     } catch { receiptWarning = 'AI completed, but server verification could not record this call.'; }
     return response({ ...output, _cleanup: cleanup, _receipt: receipt, _receiptWarning: receiptWarning });
   } catch (error) {
-    console.error("StoryLab Gemini request failed", error instanceof Error ? error.name : "error");
+    const safeDiagnostics = ['Invalid editorial review', 'Incomplete AI response', 'Invalid JSON', 'No complete AI response'];
+    console.error("StoryLab Gemini request failed", error instanceof Error && safeDiagnostics.includes(error.message) ? error.message : error instanceof Error ? error.name : "error");
     return response({ error: "AI coaching is temporarily unavailable. Please try again." }, 502);
   }
 }

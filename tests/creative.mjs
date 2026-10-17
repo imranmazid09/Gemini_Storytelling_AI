@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { campaignTypeIssues, narrativeIssues, imagePrompt, normalizeGeneratedTypography } from '../shared/creative.mjs';
+import { campaignTypeIssues, narrativeIssues, presentationIssues, imagePrompt, normalizeGeneratedTypography } from '../shared/creative.mjs';
 import { outputText } from '../src/report.js';
 import { BRIEF_FIELDS } from '../shared/brief.mjs';
 const story = 'Setup: Maya is a sophomore who signed up for Read to Rise after seeing a flyer in the campus library. She has never volunteered before and is not sure she has anything to offer. Tension: At the two-hour training she worries she is not a strong enough reader herself to help a second grader. She almost leaves early. Resolution: The trainer pairs her with a quiet eight-year-old who loves dinosaur books. They laugh through the first hour together, and Maya signs up for the full semester.';
@@ -8,6 +8,12 @@ const generic = { primaryText: 'One hour a week. A stack of dinosaur books. Read
 assert(narrativeIssues(generic, { story }).length > 0, 'The reported generic output must fail the story-preservation contract.');
 const grounded = { primaryText: 'Maya almost leaves training early. Then comes a dinosaur book. An hour of laughing together later, she signs up for the semester.', storyTrace: { moment: { sourceQuote: 'She almost leaves early.', captionQuote: 'Maya almost leaves training early.' }, turn: { sourceQuote: 'Maya signs up for the full semester.', captionQuote: 'she signs up for the semester.' } } };
 assert.deepEqual(narrativeIssues(grounded, { story }), []);
+const format = { deliverable: 'Instagram Image Post' };
+assert(presentationIssues({ primaryText: 'A'.repeat(81) }, format).length);
+assert(presentationIssues({ primaryText: 'One hour a week.\nA story unfolds.', frames: [{ onScreen: 'One hour a week' }] }, format).some(issue => issue.includes('repeats')));
+assert(presentationIssues({ primaryText: 'A story unfolds.', frames: [{ onScreen: 'These are six words on this image' }] }, format).length);
+assert.deepEqual(presentationIssues({ primaryText: "Maya nearly leaves. Then come the dinosaurs.\nThe story unfolds.", frames: [{ onScreen: "Start before you're ready" }] }, format), []);
+assert.deepEqual(presentationIssues({ primaryText: 'The story begins.', frames: [{ onScreen: 'The story begins' }] }, { deliverable: 'Instagram Video Storyboard' }), [], 'Video subtitles may echo spoken lines.');
 assert(narrativeIssues({ ...grounded, storyTrace: { ...grounded.storyTrace, turn: { sourceQuote: 'An invented child improved literacy.', captionQuote: 'She learned a lesson.' } } }, { story }).length > 0);
 assert(campaignTypeIssues({ cardObjective: 'Commercial Brand' }).length > 0);
 assert.deepEqual(campaignTypeIssues({ cardObjective: 'Volunteer Recruitment' }), []);
@@ -17,6 +23,9 @@ assert(prompt.includes('Bold graphic illustration')); assert(prompt.includes('No
 assert.equal(normalizeGeneratedTypography({ caption: 'Moment\u2014change' }).caption, 'Moment - change');
 assert(!outputText({ lockedBrief: null, content: null }).includes('\u2014'));
 const config = JSON.parse(await fs.readFile('copy-engine/v1.json', 'utf8'));
-assert(config.examples[0].copy.includes('Maya almost leaves'));
+assert(config.examples[0].copy.includes('Maya nearly leaves'));
+assert(config.examples.every(example => [...example.copy.split('\n')[0]].length <= 80), 'Craft examples must model the same opening rule as generated drafts.');
 assert(!config.systemPrompt.includes('at most two written lines'));
-console.log('PASS: reported generic caption rejected, story quotes preserved, fake source mapping rejected, campaign categories corrected, visible Do label, image treatments/text restrictions and em-dash-free export heading.');
+assert(config.editorialReview.includes("not the candidate's storyTrace"));
+assert(config.systemPrompt.includes('Never treat an earlier AI image'));
+console.log('PASS: legacy source-mapping diagnostics, opening/overlay checks, campaign categories, visible Do label, image treatments/text restrictions and em-dash-free export heading.');
