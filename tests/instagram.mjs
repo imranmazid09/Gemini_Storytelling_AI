@@ -55,6 +55,10 @@ try {
   await page.reload(); await page.locator('.instagram-image img').waitFor();
   assert.equal((await state()).assets[0].id, imageSource);
   assert.equal(await page.getByLabel('Instagram username').inputValue(), 'copperline.campus');
+  await page.locator('.upload-control').filter({ hasText: 'Upload post image' }).locator('input').setInputFiles({ name: 'student-image.png', mimeType: 'image/png', buffer: Buffer.from(image.split(',')[1], 'base64') });
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('storylab-project-v2')).assets[0]?.source === 'Student-uploaded');
+  await page.locator('.upload-control').filter({ hasText: 'Upload organization profile image' }).locator('input').setInputFiles({ name: 'organization.png', mimeType: 'image/png', buffer: Buffer.from(image.split(',')[1], 'base64') });
+  await page.locator('.ig-avatar img').waitFor();
   await page.getByLabel('Image text overlay (optional)').fill('Take a coffee pause');
   await page.getByRole('button', { name: 'Approve and review submission', exact: true }).click();
   await page.getByLabel('Your reflection (optional)', { exact: true }).fill('I kept the caption specific and chose an image that shows the approved campus moment.');
