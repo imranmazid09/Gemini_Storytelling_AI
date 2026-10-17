@@ -275,7 +275,7 @@ export default async function coach(req: Request, context: Context) {
           const review = await ai.models.generateContent({
             model,
             contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, format: payload.deliverable, creativeEnergy: payload.creativeEnergy, candidate: deduped.result }),
-            config: { systemInstruction: copyEngine.editorialReview, temperature: 0.1, responseMimeType: 'application/json', abortSignal: AbortSignal.timeout(remaining()), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}), responseJsonSchema: { type: 'object', properties: { issues: { type: 'array', items: { type: 'string' }, maxItems: 4 }, omitOverlay: { type: 'boolean' } }, required: ['issues', 'omitOverlay'], additionalProperties: false } },
+            config: { systemInstruction: copyEngine.editorialReview, temperature: 0.1, responseMimeType: 'application/json', abortSignal: AbortSignal.timeout(remaining()), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: model.startsWith('gemini-3.5-flash') ? ThinkingLevel.MEDIUM : ThinkingLevel.LOW } } : {}), responseJsonSchema: { type: 'object', properties: { issues: { type: 'array', items: { type: 'string' }, maxItems: 4 }, omitOverlay: { type: 'boolean' } }, required: ['issues', 'omitOverlay'], additionalProperties: false } },
           });
           const checked = JSON.parse(cleanJson(review.text || '{}'));
           if (!Array.isArray(checked.issues) || checked.issues.some((issue: unknown) => typeof issue !== 'string' || !issue.trim())) throw new Error('Invalid editorial review');

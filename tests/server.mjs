@@ -70,7 +70,7 @@ assert.equal(response.status, 200); assert.deepEqual(output.copyReview.issues, [
 assert(__prompts.some(prompt => prompt.contents?.includes('The image concept is generic: show')));
 const editorialCall = __prompts.find(prompt => prompt.config?.systemInstruction?.startsWith("You are StoryLab's editorial reviewer"));
 assert.equal(editorialCall.config.responseJsonSchema.properties.issues.items.type, 'string');
-assert.equal(editorialCall.config.thinkingConfig.thinkingLevel, 'LOW');
+assert.equal(editorialCall.config.thinkingConfig.thinkingLevel, 'MEDIUM');
 assert(editorialCall.config.abortSignal instanceof AbortSignal);
 globalThis.__reviews = [{ issues: [], omitOverlay: true }];
 __responses.push({ ...narrativeDraft, frames: [{ ...narrativeDraft.frames[0], onScreen: 'A weekly reading hour' }] });

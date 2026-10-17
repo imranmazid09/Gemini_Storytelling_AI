@@ -27,6 +27,7 @@ const settings = { briefFields: briefs[3], story: 'A student requests an assessm
 assert(!copyIssues(base, settings).some(issue => /hook/i.test(issue)));
 assert(copyIssues({ ...base, primaryText: base.primaryText + '\n#repair' }, settings).some(issue => issue.includes('hashtags')));
 assert(copyIssues(base, { ...settings, length: 3 }).some(issue => issue.includes('3 words')));
+assert(copyIssues({ ...base, headline: 'Twenty ideas. Zero plans.' }, settings).some(issue => issue.includes('20')), 'Spelled-out invented quantities must not bypass the approved-number check.');
 const video = { ...base, frames: [0,1,2].map(index => ({ copy: 'A student pauses.', onScreen: '', time: `${index * 5}-${(index + 1) * 5} seconds` })) };
 assert(!copyIssues(video, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 15, sceneCount: 3 }).some(issue => /consecutive|must end|scenes/.test(issue)));
 assert(copyIssues(video, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 20, sceneCount: 3 }).some(issue => issue.includes('end at 20')));

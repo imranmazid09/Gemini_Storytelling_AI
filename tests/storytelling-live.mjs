@@ -20,7 +20,9 @@ async function post(path, body) {
 }
 const { session } = await post('/api/record', { action: 'start' });
 const results = [];
-for (const brief of briefs) {
+const selected = process.env.STORYLAB_BRIEF_IDS ? briefs.filter(brief => process.env.STORYLAB_BRIEF_IDS.split(',').includes(brief.id)) : briefs;
+assert(selected.length > 0, 'Select at least one known brief.');
+for (const brief of selected) {
   const payload = { briefFields: brief, brief: JSON.stringify(brief), story: stories[brief.id], deliverable: 'Instagram Image Post', platform: 'Instagram', length: 100, hashtags: false, emojis: false, creativeEnergy: 'Lively and relatable', visualStyle: 'graphic' };
   const start = Date.now();
   try {
@@ -35,4 +37,4 @@ for (const brief of briefs) {
   await fs.writeFile('/private/tmp/storylab-storytelling-review.json', JSON.stringify(results, null, 2));
 }
 assert.deepEqual(results.filter(result => result.issues.length).map(result => result.id), [], 'Inspect flagged drafts in /private/tmp/storylab-storytelling-review.json.');
-console.log('PASS: live captions and image concepts across all six briefs; semantic review is AI judgment, not a quality guarantee.');
+console.log(`PASS: live captions and image concepts across ${selected.length} briefs; semantic review is AI judgment, not a quality guarantee.`);
