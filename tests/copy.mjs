@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { copyIssues, hookIssues, COPY_ENGINE_VERSION } from '../shared/copy.mjs';
+import { copyIssues, COPY_ENGINE_VERSION } from '../shared/copy.mjs';
 const briefs = JSON.parse(await fs.readFile('src/prebuilt-creative-briefs.json','utf8')).briefs;
 const examples = [
  ['Notebook down. Cooler door open.', 'Cold brew for the between-class break.', 'Find Copperline in the campus market cooler starting October 27.', 'Try a can from the cooler.'],
@@ -15,15 +15,19 @@ for (let i=0;i<briefs.length;i++) {
  const payload = { briefFields: briefs[i], story: 'An approved fictional scene includes a notebook, a cooler and picture books when appropriate.', hook, deliverable: 'Static Post' };
  const content = { primaryText: `${hook}\n${message}\n\n${mandatory}\n${cta}`, headline: message, cta, frames: [{ copy: hook }] };
  assert.deepEqual(copyIssues(content,payload),[],briefs[i].client);
- assert(copyIssues({...content,primaryText: content.primaryText.replace(hook,'An altered hook.')},payload).some(issue=>issue.includes('verbatim')));
  assert(copyIssues({...content,headline: 'Guaranteed value for 999 students.'},payload).some(issue=>issue.includes('999')));
  assert(copyIssues({...content,headline: 'The ultimate choice.'},payload).some(issue=>issue.includes('banned phrase')));
 }
 assert(copyIssues({primaryText:'Your outfit?\nSkip the crowded racks.\n\nNew drops every Friday.\nBrowse the Friday drop.',headline:'Vintage',cta:'Browse the Friday drop.',frames:[]},{briefFields:briefs[1],hook:'Your outfit?',story:'A student browses Friday listings.'}).some(issue=>issue.includes('crowding')));
-assert(hookIssues({options:[{tactic:'Question',hook:'A?'},{tactic:'Scene',hook:'B.'},{tactic:'Number',hook:'1.'}]}, { story: '1 approved hour' }).length===0);
-assert(hookIssues({options:[{tactic:'Question',hook:'A?'},{tactic:'Question',hook:'B?'},{tactic:'Question',hook:'C?'}]}).some(issue=>issue.includes('different')));
-assert(hookIssues({options:[{tactic:'Question',hook:'a'.repeat(81)},{tactic:'Scene',hook:'B.'},{tactic:'Number',hook:'1.'}]}).some(issue=>issue.includes('80')));
 assert.match(COPY_ENGINE_VERSION,/^\d+\.\d+\.\d+$/);
 const punctuationCopy = { primaryText: 'Cracked screen.\n\n48 West Fulton, weekdays 9 to 6.\nStop by for a screen assessment.', headline: 'Screen assessments near campus', cta: 'Stop by for a screen assessment', frames: [] };
 assert(!copyIssues(punctuationCopy,{briefFields:briefs[3],hook:'Cracked screen.',story:'A student requests an assessment.',deliverable:'Static Post'}).some(issue=>issue.includes('End the caption')));
-console.log('PASS: all six classroom briefs, verbatim hook, mandatory detail, unapproved numbers, banned language and distinct hook types.');
+const base = { ...punctuationCopy, frames: [{ title: 'Image', copy: 'Cracked screen.', visual: 'A phone.', onScreen: '' }] };
+const settings = { briefFields: briefs[3], story: 'A student requests an assessment.', deliverable: 'Instagram Image Post', length: 100, hashtags: false, emojis: false };
+assert(!copyIssues(base, settings).some(issue => /hook/i.test(issue)));
+assert(copyIssues({ ...base, primaryText: base.primaryText + '\n#repair' }, settings).some(issue => issue.includes('hashtags')));
+assert(copyIssues(base, { ...settings, length: 3 }).some(issue => issue.includes('3 words')));
+const video = { ...base, frames: [0,1,2].map(index => ({ copy: 'A student pauses.', onScreen: '', time: `${index * 5}-${(index + 1) * 5} seconds` })) };
+assert(!copyIssues(video, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 15, sceneCount: 3 }).some(issue => /consecutive|must end|scenes/.test(issue)));
+assert(copyIssues(video, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 20, sceneCount: 3 }).some(issue => issue.includes('end at 20')));
+console.log('PASS: all six briefs, mandatory detail, unapproved numbers, banned language, caption settings and storyboard duration; no separate opening approval.');

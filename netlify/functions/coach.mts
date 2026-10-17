@@ -1,12 +1,12 @@
 import type { Config, Context } from "@netlify/functions";
 import copyEngine from '../../copy-engine/v1.json' with { type: 'json' };
-import { copyTask, copyIssues, hookIssues } from '../../shared/copy.mjs';
+import { copyTask, copyIssues } from '../../shared/copy.mjs';
 import { GoogleGenAI } from "@google/genai";
 import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
 import { removeDuplicateSections } from "../../shared/response.mjs";
 import { hash, token, records, validSession } from "../lib/records.mts";
 
-type Action = "brief" | "feedback" | "hooks" | "content" | "production";
+type Action = "brief" | "feedback" | "content" | "production" | "image";
 
 type CoachRequest = {
   session?: string;
@@ -33,12 +33,16 @@ function validateResult(action: Action, result: Record<string, any>, payload: Re
     !Object.keys(BRIEF_FIELDS).some(key => /^(tbd|n\/a)$/i.test(String(key.includes('.') ? result.thinkFeelDo?.[key.split('.')[1]] : result[key]).trim()));
   if (action === "feedback") return fields(result.alignment, ['status', 'summary']) &&
     ['Aligned', 'Needs connection', 'Off brief'].includes(result.alignment.status) &&
-    fields(result.storyReadiness, ['status', 'summary']) && ['Ready for hooks', 'Revise first'].includes(result.storyReadiness.status) &&
+    fields(result.storyReadiness, ['status', 'summary']) && ['Ready for content', 'Revise first'].includes(result.storyReadiness.status) &&
     fields(result, ['connection', 'responsibility']) && Array.isArray(result.beats) && result.beats.length > 0 && result.beats.every((beat: any) => fields(beat, ['stage', 'sharpen'])) &&
     Array.isArray(result.questions) && result.questions.length > 0 && result.questions.every(text) &&
     Array.isArray(result.rubric) && result.rubric.length > 0 && result.rubric.every((entry: any) => fields(entry, ['label', 'level']));
-  if (action === "hooks") return Array.isArray(result.options) && result.options.length > 0 && result.options.every((option: any) => fields(option, ['tactic', 'trigger', 'hook', 'visual', 'onScreenText', 'audio', 'whyItWorks', 'claimCheck']) && option.hook.trim().split(/\s+/).length <= 12 && option.onScreenText.trim().split(/\s+/).length <= 8);
-  if (action === "content") return missingContent(result, String(payload.deliverable).includes('Video') ? 'video' : String(payload.deliverable) === 'Carousel' ? 'carousel' : 'static').length === 0;
+  if (action === "content") {
+    const video = payload.deliverable === 'Instagram Video Storyboard';
+    if (missingContent(result, video ? 'video' : 'static').length) return false;
+    if (result.frames.length !== (video ? Number(payload.sceneCount || 4) : 1)) return false;
+    return !video || result.frames.every((frame: any) => fields(frame, ['time', 'audio']) && typeof frame.onScreen === 'string');
+  }
   return fields(result, ['summary', 'accessibility', 'educatorSummary']) && Array.isArray(result.scenes) && result.scenes.length > 0 && result.scenes.every((scene: any) => fields(scene, ['stage', 'time', 'visual', 'audio', 'onScreen']));
 }
 
@@ -81,7 +85,7 @@ serve its objective, mark it "Needs connection." Mark it "Aligned" only when the
 the student's own draft.
 
 Brief alignment is not story quality. Separately judge whether this is a connecting narrative rather than
-an explanation, proposal or list of claims. For nonprofit and advocacy stories, "Ready for hooks" requires
+an explanation, proposal or list of claims. For nonprofit and advocacy stories, "Ready for content" requires
 a clearly focal person or ethically framed stakeholder viewpoint the audience can follow, a desire or stake,
 pressure or obstacle, a concrete moment or choice, and an observable change tied to the action. A committee,
 organization or policy idea is context, not a central character, unless one participant's viewpoint carries
@@ -106,7 +110,7 @@ Return JSON exactly shaped as:
     "missingLink": "the strategic connection the student must establish, or an empty string when aligned"
   },
   "storyReadiness": {
-    "status": "Ready for hooks|Revise first",
+    "status": "Ready for content|Revise first",
     "summary": "plain-language verdict about whether an audience can enter a focal person or audience viewpoint and its change",
     "priority": "the single most important connection revision, or an empty string when ready"
   },
@@ -127,55 +131,17 @@ Return JSON exactly shaped as:
   ]
 }.`,
       };
-    case "hooks":
-      return {
-        systemInstruction: `${shared}
-${copyEngine.hookPrompt}
-The hook is the first three seconds, not a caption paragraph. It must stop the scroll, help the intended
-audience recognize relevance and earn the next five seconds. Create extremely concise openings: the hook
-line must be no longer than 12 words and on-screen text no longer than 8 words. Coordinate three modes:
-what the audience sees immediately, reads immediately and hears immediately when audio is used.
-Use three different types: Question, Bold claim, Scene, Confession or Number. Include a requested type only when the evidence permits it; do not force three of the same type. For
-"Best fit", vary tactics appropriately for the campaign mode. Use pattern interrupt and identity call-out
-responsibly; never agitate trauma or vulnerability. Commercial bold claims must be supportable. Advocacy
-and nonprofit hooks must preserve agency and avoid pity, fearmongering or invented testimony.
-For commercial brand work, do not add "guaranteed", "only", "best", superiority comparisons or performance
-promises unless those exact claims are included as approved claims in the brief. If an approved test fact is
-given, a bold claim may state only that supported fact clearly. Do not invent proof demonstrations, test
-conditions, temperature readings, percentages or numbers beyond the approved fact in the brief, including
-in the visual concept or on-screen text. Preserve the strength of approved wording exactly: for example,
-an approved "cold" claim does not authorize "ice-cold," "freezing" or other intensified performance wording.
-For advocacy or nonprofit work, never write dialogue, first-person testimony, feelings, diagnosis impacts or
-lived experiences for a stakeholder unless the student's approved story already provides those words or facts.
-Use observable actions, design decisions, narrator copy or ambient sound instead.
-Only develop hooks from a story whose recorded alignment status is "Aligned" and story readiness status is
-"Ready for hooks".`,
-        prompt: `Develop three distinct hook options from the approved story direction.
-${context}
-Return JSON shaped as:
-{ "options": [{
-  "tactic": "Question|Bold claim|Scene|Confession|Number",
-  "trigger": "Pattern interrupt|Identity call-out|Credible tension",
-  "hook": "hook line, maximum 80 characters and 12 words",
-  "visual": "first-frame visual, one short sentence",
-  "onScreenText": "screen text, maximum 8 words",
-  "audio": "spoken line or sound cue for the opening moment",
-  "whyItWorks": "one short reason this earns attention appropriately",
-  "claimCheck": "support or responsibility check when needed"
-}] }.`,
-      };
     case "content":
       return {
         systemInstruction: `${shared}
 ${copyEngine.systemPrompt}
 Banned phrases: ${copyEngine.bannedPhrases.join(", ")}.
-Format guidance: ${copyEngine.formats[String(payload.deliverable) as keyof typeof copyEngine.formats] || copyEngine.formats["Static Post"]}
+Format guidance: ${copyEngine.formats[String(payload.deliverable) as keyof typeof copyEngine.formats] || copyEngine.formats["Instagram Image Post"]}
 Approved examples (use only when the client/story facts match): ${JSON.stringify(copyEngine.examples)}
-Translate the student's approved story and hook into platform-ready social content. Adapt the output to the
-selected static post, carousel, short video or paid ad. Preserve the selected hook execution's visual,
-text and audio logic where it fits the final format. For a paid ad, keep claims supportable and the CTA
-appropriate. Apply the campaign-mode standards rather than making every post sound like advocacy.
-Make the copy ready to place in a design or editing tool. Provide exact text and concrete visual directions, no placeholders. Carousel frames contain a finished card headline and body in copy. Short video frames contain finished spoken lines or captions in copy, with visual shot instructions. A static post or paid ad has one frame. Preserve approved facts without embellishment. Include the locked mandatory detail and CTA. Do not invent student rationale.`,
+Translate the student's approved story directly into the selected Instagram format. The creative brief is unchanged; the selected studio format determines this output. Apply campaign-mode standards. Preserve approved facts, mandatory details and the CTA without embellishment. Do not invent student rationale.
+For Instagram Image Post, return exactly one still-image frame. No video motion, shot sequence, timestamps or audio. Caption length must be no more than the requested word limit. Text overlay is optional and concise, at most 16 words.
+For Instagram Video Storyboard, return exactly the requested sceneCount. Every scene has title, copy (the exact script or voiceover), visual (concrete action and image direction), time (consecutive start-end seconds), audio (sound direction), onScreen (optional text) and altText. The last scene ends at duration seconds. Keep speech feasible at about 2 words per second or fewer. This is a production plan, not a rendered video.
+When hashtags is false, do not add hashtags. When true, add a few relevant hashtags after the CTA on a separate line. Include emojis only when emojis is true. Never invent engagement statistics.`,
         prompt: `${copyTask(payload)}
 Create an editable social content draft.
 ${context}
@@ -187,16 +153,13 @@ Return JSON shaped as:
   "visualDirection": "respectful visual concept",
   "altText": "accessible alt text for the primary visual",
   "ethicalCheck": "one responsibility or claim check",
-  "frames": [{"title": "frame/card/beat title", "copy": "short copy", "visual": "direction"}]
+  "frames": [{"title": "image or scene title", "copy": "short image message or exact scene script", "visual": "still image direction or scene action", "time": "Image 1 for a still; consecutive start-end seconds for video", "audio": "Not applicable for still; sound direction for video", "onScreen": "optional exact text overlay or empty string", "altText": "image description"}]
 }.`,
       };
     case "production":
       return {
         systemInstruction: `${shared}
-Create only the execution material needed for the selected deliverable. Static posts need a frame plan, not
-a video storyboard. Carousels need card sequencing. Videos need timed shots and caption guidance. Paid ads
-need execution directions and a clear claim/CTA review.
-This is an executable handoff: each scene has exact on-screen copy, shot/card composition, and actual voiceover or sound cues. Videos use explicit time ranges totaling a feasible short video; carousels use card numbers; static and paid ads use one frame. Use "Not applicable — static format" for audio only in static formats. Reuse approved content.frames and copy; do not rewrite approved claims, add new facts or invent missing decisions. Accessibility must give usable alt text or caption instructions. educatorSummary describes this production package only; never invent student revision, effort or learning.`,
+Prepare concise final guidance for the selected Instagram output. An Instagram Image Post has exactly one still-image item and its caption. An Instagram Video Storyboard uses the student's approved scene count and exact script, time, visual, audio and onScreen fields. Do not rewrite approved content or add scenes. Accessibility includes usable alt text and video caption instructions when applicable. educatorSummary describes the package; never invent student effort or learning.`,
         prompt: `Turn the student's approved content into a final production package.
 ${context}
 Return JSON shaped as:
@@ -224,7 +187,7 @@ export default async function coach(req: Request, context: Context) {
     return response({ error: "Request body must be valid JSON." }, 400);
   }
 
-  if (!body.action || !["brief", "feedback", "hooks", "content", "production"].includes(body.action)) {
+  if (!body.action || !["brief", "feedback", "content", "production", "image"].includes(body.action)) {
     return response({ error: "A valid coaching action is required." }, 400);
   }
 
@@ -239,36 +202,41 @@ export default async function coach(req: Request, context: Context) {
     return response({ error: "The draft is too large for this coaching request." }, 413);
   }
 
-  if (body.action === 'hooks') {
-    const feedback = payload.feedback as any;
-    if (feedback?.alignment?.status !== 'Aligned' || feedback?.storyReadiness?.status !== 'Ready for hooks') return response({ error: 'Revise your story and request feedback before developing hooks.' }, 400);
-  }
   const model = Netlify.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
-  const { systemInstruction, prompt } = promptFor(body.action, payload);
+  const { systemInstruction, prompt } = body.action === 'image' ? { systemInstruction: '', prompt: '' } : promptFor(body.action, payload)!;
 
   try {
     const ai = new GoogleGenAI({ apiKey });
     let output: Record<string, any> | undefined;
+    if (body.action === 'image') {
+      if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return response({ error: 'An approved image direction is required.' }, 400);
+      const configuredModel = Netlify.env.get('GEMINI_IMAGE_MODEL');
+      const imageModel = configuredModel && !configuredModel.startsWith('imagen-') ? configuredModel : 'gemini-3.1-flash-image';
+      const generated = await ai.models.generateContent({ model: imageModel, contents: `Create a polished editorial illustration for a fictional classroom Instagram project. Keep character design and palette consistent with the supplied story. Use only this approved scene: ${payload.prompt}. Context: ${payload.context || ''}. Brief constraints: ${payload.brief || ''}. No printed words, lettering, logos, watermarks, unsupported proof demonstrations or invented claims. The application adds text separately.`, config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
+      const image = generated.candidates?.flatMap(candidate => candidate.content?.parts || []).find(part => part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
+      if (!image?.data) return response({ error: 'The image could not be generated. Revise its direction or upload an image.' }, 422);
+      if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.' }, 413);
+      output = { dataUrl: `data:${image.mimeType};base64,${image.data}`, source: 'AI-generated', model: imageModel, imageHash: hash(image.data) };
+    }
     let cleanup = 0;
     let repairIssues: string[] = [];
     let previousDraft = "";
     let bestCopy: { draft: Record<string, any>; issues: string[]; cleanup: number } | undefined;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; !output && attempt < 2; attempt++) {
       const result = await ai.models.generateContent({
         model,
-        contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts or changing the selected hook: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
-        config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "hooks" ? copyEngine.temperatures.hooks : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json" },
+        contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
+        config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json" },
       });
       let parsed;
       try { parsed = JSON.parse(cleanJson(result.text || "")); } catch { if (!attempt) continue; if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Invalid JSON'); }
       const deduped = removeDuplicateSections(parsed);
       if (deduped.removed && !attempt) { repairIssues = ['Remove repeated labeled sections.']; continue; }
       if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
-      const issues = body.action === 'content' ? copyIssues(deduped.result, payload) : body.action === 'hooks' ? hookIssues(deduped.result, payload) : [];
+      const issues = body.action === 'content' ? copyIssues(deduped.result, payload) : [];
       if (body.action === 'content' && (!bestCopy || issues.length < bestCopy.issues.length)) bestCopy = { draft: deduped.result, issues, cleanup: deduped.removed };
       if (issues.length && !attempt) { repairIssues = issues; previousDraft = JSON.stringify(deduped.result); continue; }
-      if (issues.length && body.action === 'hooks') throw new Error('Hook options did not meet the required type/length checks');
-      output = { ...deduped.result, ...(body.action === 'hooks' || body.action === 'content' ? { aiGenerated: true, copyEngineVersion: copyEngine.version } : {}) };
+      output = { ...deduped.result, ...(body.action === 'content' ? { aiGenerated: true, copyEngineVersion: copyEngine.version } : {}) };
       if (body.action === 'content' && bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; }
       cleanup = body.action === 'content' && bestCopy ? bestCopy.cleanup : deduped.removed;
       break;
@@ -282,7 +250,8 @@ export default async function coach(req: Request, context: Context) {
       const store = records(context.deploy.context);
       if (await validSession(store, body.session)) {
         receipt = token();
-        await store.setJSON(`calls/${receipt}`, { sessionHash: hash(body.session!), action: body.action, at: new Date().toISOString(), inputHash: hash(JSON.stringify(payload)), outputHash: hash(JSON.stringify(output)) }, { onlyIfNew: true });
+        const { dataUrl: _image, ...metadata } = output;
+        await store.setJSON(`calls/${receipt}`, { sessionHash: hash(body.session!), action: body.action, at: new Date().toISOString(), inputHash: hash(JSON.stringify(payload)), outputHash: hash(JSON.stringify(body.action === 'image' ? metadata : output)) }, { onlyIfNew: true });
       } else receiptWarning = 'This AI call has no verified session receipt.';
     } catch { receiptWarning = 'AI completed, but server verification could not record this call.'; }
     return response({ ...output, _cleanup: cleanup, _receipt: receipt, _receiptWarning: receiptWarning });

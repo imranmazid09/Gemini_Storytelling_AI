@@ -6,15 +6,15 @@ organization while retaining authorship of the final creative work.
 
 ## Student Flow
 
-1. **Creative Brief**: choose organization-sensitive objectives and tone, add any optional approved claim, then generate and edit a strategy brief.
-2. **Story Studio**: draft an arc, receive campaign-aware Socratic feedback, and build a short visual/text/audio hook for the opening moment.
-3. **Content Studio**: generate and edit a static post, carousel, short video concept or paid ad.
-4. **Final Package**: prepare format-relevant execution directions, accessibility checks and an educator snapshot.
+1. **Creative Brief**: the existing six comparison cards, fictional AI brief generation, structured fields, read confirmation and locking behavior are preserved.
+2. **Story Workshop**: draft an arc, receive campaign-aware Socratic feedback and approve the story. There is no separate hook workshop or approval requirement.
+3. **Instagram Content Studio**: create an image post with a full Instagram mockup, or a video script with an illustrated storyboard. Choose caption length, optional hashtags/emojis, and video duration and scene count. Generate or upload images, then edit captions, scene copy, sound directions, overlays and alt text.
+4. **Review + Submit**: review the approved output, write a reflection and download a Blackboard ZIP with creative PNGs, caption/script and the instructor learning record. Video storyboards include a self-contained illustrated HTML document that can be printed or saved as PDF; they are not rendered videos.
 
 AI feedback first checks whether the student's draft is strategically aligned with the locked
 brief, then separately checks whether it works as a connecting story through a focal character,
 pressure and meaningful change. Students receive concise beat-by-beat revision guidance for their
-selected arc. Hook development remains closed until the story is aligned and story-ready.
+selected arc. Content Studio opens after the story is aligned and ready for content.
 The coach differentiates commercial brand, nonprofit/community-service, advocacy/public-policy
 and public-service communication instead of forcing every assignment into an advocacy pattern.
 
@@ -47,6 +47,7 @@ To test coaching locally, configure Netlify development environment variables fo
 ```txt
 GEMINI_API_KEY=your_server_side_gemini_api_key
 GEMINI_MODEL=gemini-3.5-flash
+GEMINI_IMAGE_MODEL=gemini-3.1-flash-image
 ```
 
 4. Deploy the site and verify a generated creative brief and coaching response.
@@ -66,7 +67,7 @@ Step 1 offers six comparison cards and one-click fictional AI briefs. Browsing u
 practice rather than verified real-world advertising claims. The locked structured brief feeds all later
 coaching. The student still writes the story and approves creative decisions.
 
-Project state, retained AI drafts and before/after edits autosave in this browser. Clearing browser storage
+Project state, retained AI drafts and before/after edits autosave in this browser. Images are stored separately in IndexedDB, so large image data does not fill the text autosave. Clearing browser storage
 removes local work. A persistent banner reports storage failure; a local document can be downloaded at
 any stage. Starting a new project requires confirmation.
 
@@ -120,10 +121,25 @@ unlock and every structure selector, including browsers without native dialogs o
 
 ### Evidence-supported copy engine
 
-`copy-engine/v1.json` versions the prompt, safe examples, banned language, format guidance and hook
-taxonomy. Three hook options use different types and only supplied numbers. Content opens with the
-selected hook verbatim and preserves mandatory details and constraints. One repair attempt names the
-failed checks. If a complete draft still needs correction, retain the best attempt and show its
-remaining issues for student editing. Checks support review, not grading or factual certification.
-The selected hook remains visible beside the editor. Copy-engine versions are retained with AI
-outputs and in the downloadable learning record. The student continues to write the story.
+`copy-engine/v1.json` versions the prompt, safe examples, banned language and Instagram format guidance.
+Content develops directly from the approved story and preserves mandatory details and constraints.
+Checks cover caption settings and consecutive scene timing. One repair attempt names failed checks;
+the best complete draft is retained with any remaining issues for student editing. These checks support
+review, not grading or factual certification. Copy-engine versions remain in the learning record.
+
+### Instagram asset exports
+
+The image-post mockup includes a profile image or initial, username, optional location, post image,
+caption, action icons, timestamp and optional explicitly simulated engagement. It exports as a PNG
+with a classroom-concept label. The separate design PNG omits Instagram interface elements.
+Every video scene pairs a portrait image with exact script, action, time, on-screen text and sound.
+Only metadata and an image hash are retained in AI records; base image bytes stay in browser storage.
+Both verified and explicitly unverified local ZIPs are available. Verification does not prove authorship.
+
+Image generation uses the existing server-side Gemini key. Retired Imagen model settings fall back to
+`gemini-3.1-flash-image`. An image-generation failure leaves the content intact and students can upload
+an image instead. Uploaded PNG, JPEG and WebP files are resized locally before saving.
+
+Run `npm run test:browser` with Playwright and an installed Chrome browser for both output paths,
+image reload recovery, custom duration/length, PNG exports, ZIP contents and narrow-screen checks.
+`node tests/live-preview.mjs` is an opt-in live text and image smoke test and consumes provider usage.

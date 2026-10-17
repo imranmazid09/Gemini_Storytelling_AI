@@ -1,16 +1,22 @@
 import { missingBrief } from '../shared/brief.mjs';
 import { useEffect, useRef, useState } from 'react';
 export const STORAGE_KEY = 'storylab-project-v2';
+const instagramDefaults = { studioVersion: 1, assets: [], captionLength: '100', customLength: '', duration: '30', customDuration: '', sceneCount: '4', hashtags: false, emojis: false, profileName: '', username: '', location: '', timestamp: 'Just now', avatarId: '', showEngagement: false, likes: '0', exampleComment: '', overlayPosition: 'bottom' };
 export function freshProject() {
-  return { version: 2, projectId: crypto.randomUUID(), startedAt: new Date().toISOString(), stage: 1, brief: null, lockedBrief: null, readBrief: false, arc: 'threeAct', arcDrafts: {}, feedback: null, hookOptions: [], selectedHook: '', selectedHookPlan: null, hookTactic: 'recommended', storyLocked: false, deliverable: 'static', platform: 'Instagram', content: null, contentLocked: false, production: null, history: [], aiOutputs: [], receipts: [], session: null, reflection: '' };
+  return { version: 2, ...instagramDefaults, projectId: crypto.randomUUID(), startedAt: new Date().toISOString(), stage: 1, brief: null, lockedBrief: null, readBrief: false, arc: 'threeAct', arcDrafts: {}, feedback: null, storyLocked: false, deliverable: 'static', platform: 'Instagram', content: null, contentLocked: false, production: null, history: [], aiOutputs: [], receipts: [], session: null, reflection: '' };
 }
 export function readProject() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return { project: freshProject(), error: '' };
-    const project = JSON.parse(saved);
+    let project = JSON.parse(saved);
     if (project.version !== 2 || !Array.isArray(project.history) || !Array.isArray(project.aiOutputs) || !Array.isArray(project.receipts) || !Number.isInteger(project.stage) || project.stage < 1 || project.stage > 4 || !project.arcDrafts || !['threeAct', 'storybrand', 'freytag'].includes(project.arc)) throw new Error('Invalid saved project');
-    if ((project.lockedBrief && missingBrief(project.lockedBrief).length) || (project.stage > 1 && !project.lockedBrief) || (project.stage > 2 && (!project.storyLocked || !project.selectedHook)) || (project.stage > 3 && (!project.contentLocked || !project.content))) throw new Error('Incomplete saved project');
+    if ((project.lockedBrief && missingBrief(project.lockedBrief).length) || (project.stage > 1 && !project.lockedBrief) || (project.stage > 2 && !project.storyLocked) || (project.stage > 3 && (!project.contentLocked || !project.content))) throw new Error('Incomplete saved project');
+    if (!project.studioVersion) {
+      project = addEvent({ ...instagramDefaults, ...project, studioVersion: 1, platform: 'Instagram', deliverable: project.deliverable === 'video' ? 'video' : 'static', content: null, contentLocked: false, production: null, stage: Math.min(project.stage, project.storyLocked ? 3 : 2) }, 'Instagram studio updated', 'Brief, story and learning history preserved. Create a new Instagram draft; earlier AI drafts remain in the record.');
+      if (project.feedback?.storyReadiness?.status === 'Ready for hooks') project.feedback = { ...project.feedback, storyReadiness: { ...project.feedback.storyReadiness, status: 'Ready for content' } };
+      delete project.hookOptions; delete project.selectedHook; delete project.selectedHookPlan; delete project.hookTactic;
+    }
     return { project, error: '' };
   } catch {
     return { project: freshProject(), error: 'Your saved project could not be restored. The original save will be kept until you choose New project. Downloads remain available.' };
@@ -59,7 +65,7 @@ export function learningSummary(project) {
   const edits = project.history.filter(event => event.action === 'Edited' && JSON.stringify(event.before) !== JSON.stringify(event.after));
   const feedback = project.aiOutputs.filter(output => output.action === 'feedback');
   const storyEditsAfterFeedback = edits.filter(event => event.target.startsWith('Story:') && project.history.slice(0, project.history.indexOf(event)).some(previous => previous.action === 'Story feedback received'));
-  const approvals = project.history.filter(event => event.action === 'Content approved' || event.action === 'Brief locked' || event.action === 'Story and hook approved');
+  const approvals = project.history.filter(event => event.action === 'Content approved' || event.action === 'Brief locked' || event.action === 'Story approved');
   return { editCount: edits.length, feedbackRounds: feedback.length, successfulCalls: project.aiOutputs.length, approvals, statements: [
     `${project.aiOutputs.length} successful AI responses and ${feedback.length} story feedback rounds were recorded in this browser.`,
     `${edits.length} edit episodes changed a field from its starting value. Consecutive typing in the same field is one episode.`,

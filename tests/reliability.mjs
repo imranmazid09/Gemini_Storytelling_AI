@@ -9,8 +9,8 @@ const feedback = { alignment: { status: 'Aligned', summary: 'Specific audience a
 const hook = { hook: 'Take a break between classes.', tactic: 'Relatability', trigger: 'Identity call-out', visual: 'Cooler opens.', onScreenText: 'Time for a break.', audio: 'Door opens.', whyItWorks: 'Concrete moment.', claimCheck: 'Supplied facts only.' };
 const content = { primaryText: 'Time for a break. Find Copperline in the campus market cooler starting October 27.', headline: 'Time for a break', cta: 'Try a can.', visualDirection: 'Can beside notebook.', altText: 'Can beside notebook.', ethicalCheck: 'Fictional classroom facts.', frames: [{ title: 'Frame 1', copy: 'Time for a break.', visual: 'Can beside notebook.' }] };
 const production = { summary: 'Build this post.', scenes: [{ stage: 'Frame 1', time: 'Frame 1', visual: 'Can beside notebook.', onScreen: 'Time for a break.', audio: 'Not applicable — static format' }], accessibility: 'Use legible contrast.', educatorSummary: 'Approved copy and visual.' };
-const stageFor = { brief: 1, feedback: 2, hooks: 2, content: 3, production: 4 };
-const buttonFor = { brief: 'Generate a brief', feedback: 'Get focused feedback', hooks: 'Create 3-second hooks', content: 'Generate content draft', production: 'Build package' };
+const stageFor = { brief: 1, feedback: 2, content: 3, production: 4 };
+const buttonFor = { brief: 'Generate a brief', feedback: 'Get focused feedback', content: 'Generate Instagram draft', production: 'Build final guidance' };
 const outputFor = { brief: { ...brief, id: 'ai-new', client: 'New Fictional Client', aiGenerated: true }, feedback, hooks: { options: [hook] }, content, production };
 async function setup(action) {
  const project = { ...freshProject(), session: 'a'.repeat(48), stage: stageFor[action], brief: action === 'brief' ? null : brief, lockedBrief: action === 'brief' ? null : brief, arcDrafts: action === 'brief' ? {} : { Setup: 'Mina leaves class for a break.', Tension: 'She wants a brief pause before her next class.', Resolution: 'She chooses a can from the campus cooler.' }, feedback: action === 'hooks' ? feedback : null, storyLocked: ['content', 'production'].includes(action), selectedHook: ['content', 'production'].includes(action) ? hook.hook : '', selectedHookPlan: ['content', 'production'].includes(action) ? hook : null, contentLocked: action === 'production', content: action === 'production' ? content : null };
@@ -45,7 +45,7 @@ for (const action of Object.keys(stageFor)) {
  assert.equal(await page.getByRole('button', { name: 'Cancel request', exact: true }).count(), 0);
  assert.deepEqual(test.errors, []);
  if (action === 'brief') assert(await page.getByRole('button', { name: 'Regenerate a brief', exact: true }).isEnabled());
- if (action === 'production') assert((await page.locator('.package-header').innerText()).includes('Instagram Static Post'));
+ if (action === 'production') assert((await page.locator('.package-header').innerText()).includes('Instagram image + caption'));
  await page.close(); console.log(`PASS: ${action} loading, hard timeout, error, retry, recovery without native browser APIs.`);
 }
 // An edit cancels the old request and preserves the new draft.

@@ -10,7 +10,7 @@ export function readable(value, indent = '') {
 }
 export function outputText(project) {
   const { content, production } = project;
-  return [`STORYLAB PRO — CONTENT PRODUCTION HANDOFF`, `Fictional classroom client: ${project.lockedBrief?.client}`, `Format: ${project.platform} ${project.deliverable}`, `Exported: ${new Date().toISOString()}`, '', 'FINAL COPY', content?.primaryText, '', 'HEADLINE', content?.headline, '', 'CALL TO ACTION', content?.cta, '', 'VISUAL DIRECTION', content?.visualDirection, '', 'ALT TEXT', content?.altText, '', ...(content?.frames || []).flatMap((frame, index) => [`CARD / BEAT ${index + 1}: ${frame.title}`, frame.copy, frame.visual, '']), 'PRODUCTION PLAN', production?.summary, ...(production?.scenes || []).flatMap(scene => [`${scene.stage} · ${scene.time}`, `Visual: ${scene.visual}`, `On screen: ${scene.onScreen}`, `Audio: ${scene.audio}`, '']), 'ACCESSIBILITY', production?.accessibility, '', 'CLAIM / RESPONSIBILITY CHECK', content?.ethicalCheck, '', 'LOCKED BRIEF', briefText(project.lockedBrief)].join('\n');
+  return [`STORYLAB PRO — INSTAGRAM PRODUCTION HANDOFF`, `Fictional classroom client: ${project.lockedBrief?.client}`, `Format: Instagram ${project.deliverable === 'video' ? 'video storyboard' : 'image post'}`, `Exported: ${new Date().toISOString()}`, '', 'CAPTION', content?.primaryText, '', 'HEADLINE', content?.headline, '', 'CALL TO ACTION', content?.cta, '', ...(content?.frames || []).flatMap((frame, index) => [`${project.deliverable === 'video' ? 'SCENE' : 'IMAGE'} ${index + 1}: ${frame.title}`, `Time: ${frame.time || 'Still image'}`, `Script: ${frame.copy}`, `Visual: ${frame.visual}`, `On-screen text: ${frame.onScreen || 'None'}`, `Sound: ${frame.audio || 'Not applicable'}`, `Alt text: ${project.assets?.[index]?.altText || frame.altText || content.altText}`, '']), 'PRODUCTION GUIDANCE', production?.summary, '', 'ACCESSIBILITY', production?.accessibility, '', 'CLAIM / RESPONSIBILITY CHECK', content?.ethicalCheck, '', 'LOCKED BRIEF', briefText(project.lockedBrief)].join('\n');
 }
 export function downloadFile(name, value, type) {
   const url = URL.createObjectURL(new Blob([value], { type }));
@@ -34,7 +34,7 @@ ${block('What you did', report.summary.statements.join('\n'))}
 ${block('Student reflection', report.reflection || 'No reflection entered.')}
 ${block('Content production handoff', outputText(report))}
 ${block('Student story draft', Object.entries(report.arcDrafts).map(([key, value]) => `${key}: ${value}`).join('\n'))}
-${block('Selected hook execution', readable(report.selectedHookPlan))}
+${block('Instagram image decisions', readable(report.assets || []))}
 ${block('Latest coaching feedback', readable(report.feedback))}
 <section><h2>Timestamped decisions and changes</h2>${report.history.map(event => `<article><b>${escape(event.action)}</b><p>${escape(event.at)}${event.endedAt ? ` → ${escape(event.endedAt)}` : ''}</p><p>${escape(event.detail)}</p>${Object.hasOwn(event, 'before') ? `<b>Before</b><pre>${escape(typeof event.before === 'string' ? event.before : readable(event.before))}</pre><b>After</b><pre>${escape(typeof event.after === 'string' ? event.after : readable(event.after))}</pre>` : ''}</article>`).join('')}</section>
 <section><h2>AI drafts retained for comparison</h2>${report.aiOutputs.map((entry, index) => `<article><h3>${index + 1}. AI-generated ${escape(entry.action)} · ${escape(entry.at)}${entry.copyEngineVersion ? ` · copy engine ${escape(entry.copyEngineVersion)}` : ''}</h3><pre>${escape(readable(entry.output))}</pre></article>`).join('')}</section>

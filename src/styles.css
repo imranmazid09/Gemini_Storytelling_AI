@@ -1375,3 +1375,68 @@ main {
 .approved-hook p { margin: 8px 0; }
 
 @media (min-width: 701px) and (max-width: 950px) { .brief-gallery { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+/* Instagram production studio. */
+.studio { scroll-margin-top: 96px; }
+.instagram-studio { display: grid; gap: 24px; }
+.studio-settings h3, .instagram-editor h3, .instagram-live-preview h3, .submission-panel h3 { margin-bottom: 16px; }
+.instagram-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; margin: 24px 0; }
+.instagram-studio .field input, .instagram-studio .field textarea, .instagram-studio .field select { font-size: 16px; min-height: 48px; }
+.instagram-studio .field textarea { height: auto; }
+.toggle-row { display: flex; flex-wrap: wrap; align-items: center; gap: 24px; margin: 16px 0 24px; font-size: 14px; }
+.toggle-row label { display: flex; gap: 8px; align-items: center; }
+.toggle-row input { width: 20px; height: 20px; }
+.instagram-editor-layout { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 24px; align-items: start; }
+.instagram-editor { display: grid; gap: 16px; min-width: 0; }
+.instagram-editor .micro-note { margin: 0 0 8px; text-align: left; }
+.instagram-live-preview { position: sticky; top: 96px; min-width: 0; }
+.profile-settings { padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.profile-settings summary { font-weight: 650; cursor: pointer; margin-bottom: 16px; }
+.profile-settings .field { margin: 16px 0; }
+.scene-editor { display: grid; gap: 16px; border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.scene-editor legend { font-weight: 700; font-size: 14px; padding: 0 8px; }
+.asset-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.asset-buttons button, .upload-control { min-height: 48px; }
+.upload-control { display: flex; align-items: center; justify-content: center; position: relative; gap: 8px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; background: white; cursor: pointer; overflow: hidden; }
+.upload-control input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.upload-control:focus-within { outline: 3px solid #1865f2; outline-offset: 3px; }
+.ig-preview-wrap { width: 100%; max-width: 540px; margin: 24px auto; }
+.concept-label { color: #63716c; font-size: 12px; margin: 0 0 8px; }
+.instagram-post { background: #fff; color: #121212; border: 1px solid #dbdbdb; border-radius: 12px; overflow: hidden; font: 14px/1.5 Arial,sans-serif; width: 100%; }
+.ig-post-header { display: flex; align-items: center; gap: 12px; padding: 16px; }
+.ig-avatar { width: 36px; height: 36px; border-radius: 50%; background: #d9ebe3; color: #194a42; display: grid; place-items: center; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.ig-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ig-post-header > div:nth-child(2) { display: grid; min-width: 0; }
+.ig-post-header b { overflow-wrap: anywhere; }
+.ig-post-header small { font-size: 12px; }
+.ig-post-header > svg { margin-left: auto; flex-shrink: 0; }
+.instagram-image { aspect-ratio: 1; position: relative; background: #f1f3f0; overflow: hidden; width: 100%; }
+.instagram-image.portrait { aspect-ratio: 9/16; }
+.instagram-image > img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.image-placeholder { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; padding: 24px; color: #63716c; text-align: center; }
+.image-overlay { position: absolute; left: 0; width: 100%; padding: 5% 6.67%; color: white; background: rgba(0,0,0,.64); font: 700 clamp(16px,2.2vw,28px)/1.25 Arial,sans-serif; overflow-wrap: anywhere; white-space: pre-wrap; }
+.overlay-bottom { bottom: 0; }.overlay-top { top: 0; }.overlay-center { top: 50%; transform: translateY(-50%); }
+.ig-actions { display: flex; gap: 16px; padding: 16px; }
+.ig-actions svg { width: 24px; height: 24px; stroke-width: 1.8; }
+.ig-actions .ig-save { margin-left: auto; }
+.ig-copy { padding: 0 16px 16px; }
+.ig-copy > p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ig-likes { display: block; margin-bottom: 8px; }
+.ig-more { border: 0; background: transparent; color: #666; padding: 8px 0; font: inherit; }
+.ig-time { display: block; margin-top: 16px; font-size: 11px; color: #666; text-transform: uppercase; }
+.ig-comment { margin-top: 8px; }.ig-comment small { color: #666; }
+.ig-comment-placeholder { display: flex; justify-content: space-between; margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee; color: #666; }
+.ig-comment-placeholder span { color: #1865f2; }
+.storyboard-grid { display: grid; gap: 24px; margin-top: 24px; }
+.storyboard-card { display: grid; grid-template-columns: minmax(100px,.7fr) minmax(0,1fr); gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 24px; align-items: start; }
+.storyboard-card h4 { margin: 8px 0 16px; }.storyboard-card .eyebrow { font-size: 11px; }
+.storyboard-card dl { margin: 0; font-size: 13px; line-height: 1.55; }.storyboard-card dt { font-weight: 700; margin-top: 8px; }.storyboard-card dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.storyboard-card .image-overlay { font-size: 13px; }
+.review-post .ig-preview-wrap { margin: 0 auto; }
+.submission-panel p { line-height: 1.6; margin: 16px 0; }
+.submission-panel .package-actions { flex-wrap: wrap; margin-top: 24px; }
+.package-layout details summary { cursor: pointer; padding: 16px 0; font-weight: 650; }
+.ig-export .image-overlay { font-size: 32px; }
+@media(min-width:1100px) { .package-layout > .panel > .storyboard-grid { grid-template-columns: 1fr 1fr; } }
+@media(max-width:980px) { .instagram-editor-layout { grid-template-columns: 1fr; }.instagram-live-preview { position: static; }.instagram-settings-grid { grid-template-columns: 1fr 1fr; } }
+@media(max-width:600px) { .instagram-settings-grid { grid-template-columns: 1fr; }.instagram-studio .panel { padding: 16px; }.storyboard-card { grid-template-columns: minmax(100px,.65fr) minmax(0,1fr); gap: 16px; }.asset-buttons > * { width: 100%; }.instagram-live-preview .image-overlay { font-size: 22px; }.stage-nav span { font-size: 12px; } }

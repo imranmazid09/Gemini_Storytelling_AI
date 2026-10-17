@@ -12,5 +12,6 @@ export const CONTENT_FIELDS = ['primaryText', 'headline', 'cta', 'visualDirectio
 export function missingContent(content, format) {
   const missing = CONTENT_FIELDS.filter(key => typeof content?.[key] !== 'string' || !content[key].trim());
   if (!Array.isArray(content?.frames) || content.frames.length === 0 || content.frames.some(frame => ['title', 'copy', 'visual'].some(key => typeof frame?.[key] !== 'string' || !frame[key].trim()))) missing.push('complete frames / cards');
+  if (format === 'video' && content?.frames?.some(frame => !frame.time?.trim() || !frame.audio?.trim())) missing.push('scene timing and sound');
   return missing;
 }
