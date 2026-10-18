@@ -4,7 +4,7 @@ import { BRIEF_FIELDS, getField, briefText, missingBrief, missingContent } from 
 import { useProject, addEvent, edit, learningSummary } from './project';
 import { downloadFile, makeReport, outputText, reportHtml, recordDigest } from './report';
 import Verification from './Verification';
-import { fetchJSON, requestFailure } from './request';
+import { fetchJSON, requestFailure, failureDetails } from './request';
 import { COPY_ENGINE_VERSION, copyIssues } from '../shared/copy.mjs';
 import { presentationIssues } from '../shared/creative.mjs';
 import { applyChoice, choicesComplete, reviewChoice } from '../shared/choices.mjs';
@@ -162,8 +162,10 @@ function App() {
     try { await Promise.race([operation(controller.signal), canceled]); }
     catch (failure) {
       if (activeRequest.current?.controller !== controller) return;
-      setError(failure?.message || 'The request failed. Your work is safe; try again.');
-      setRetryAction(name); record('Request failed', name);
+      const details = failureDetails(failure);
+      if (name === 'image' && details.failureCategory === 'service-or-connection-error') details.explanation += ' No image-review rejection was confirmed.';
+      setError(name === 'image' ? `${details.explanation} Your story, captions and choices are preserved. Use Generate or Regenerate beside the image to retry.` : failure?.message || 'The request failed. Your work is safe; try again.');
+      setRetryAction(name); record('Request failed', `${name}: ${details.explanation}`, { requestAction: name, ...details });
     } finally {
       clearTimeout(deadline); controller.signal.removeEventListener('abort', onAbort);
       if (activeRequest.current?.controller === controller) { activeRequest.current = null; busy.current = false; setLoading(''); }
@@ -272,6 +274,8 @@ function App() {
     const result = await requestCoach('image', { prompt: frame.visual, visualStyle: project.visualStyle, context: arcText, brief: briefText(lockedBrief), frame: index + 1, aspectRatio: deliverable === 'video' ? '9:16' : '1:1' }, signal);
     if (signal.aborted) return;
     await storeImage(index, result.dataUrl, 'AI-generated', signal);
+    if (signal.aborted) return;
+    if (result.imageReview?.rejectedAttempts > 0) record('Image review retry succeeded', `Image ${index + 1}: an earlier generated image was rejected by review; a replacement passed.`, { attempts: result.imageReview.attempts, rejectedAttempts: result.imageReview.rejectedAttempts });
   });
   const uploadImage = (index, file) => run('upload', async signal => {
     const image = await prepareUpload(file);
@@ -335,11 +339,12 @@ function App() {
 
           </div>
           <p className="workspace-intro">Your drafts and timestamped edits are saved in this browser. Verified downloads send only record hashes and call metadata to the tool. No names are collected. Anyone with the verification link can view its receipt.</p>
+          <p className="micro-note">Starting a different assignment or sharing this browser? Download your current work, then choose <strong>New project</strong>. Keep revisions for the same assignment in this project.</p>
           <button className="ghost-button" onClick={() => downloadReport(false)} disabled={Boolean(loading)}>Save a local copy of work and learning record</button>
           {saveError && <div className="error-banner" role="alert">{saveError}</div>}
           {verificationWarning && <div className="error-banner" role="status">{verificationWarning}</div>}
           {loading && <div className="request-status" role="status" aria-live="polite" aria-label="Request progress"><Spinner /><div><b>{({ brief: 'Generating your creative brief…', feedback: 'Reviewing your story…', content: 'Generating your content draft…', image: 'Creating your image…', upload: 'Saving your image…', submission: 'Preparing your submission…', production: 'Building your production package…', export: 'Preparing your verified record…', localExport: 'Preparing your local record…' })[loading]}</b><p>{saveError ? "Autosave is unavailable; keep this tab open." : "Your work is saved in this browser."} This request will stop within {loading === 'image' ? '60' : '45'} seconds.</p></div><button className="secondary-button" onClick={() => cancelPending()}>Cancel request</button></div>}
-          {error && <div className="error-banner" id="request-error" role="alert">{error} <button className="secondary-button" disabled={Boolean(loading) || !canRetry} onClick={retry}>Try again</button></div>}
+          {error && <div className="error-banner" id="request-error" role="alert">{error} {retryAction !== 'image' && <button className="secondary-button" disabled={Boolean(loading) || !canRetry} onClick={retry}>Try again</button>}</div>}
           <div className="workspace-controls">
           <StageNav stage={stage} canVisit={canVisit} onSelect={setStage} />
 

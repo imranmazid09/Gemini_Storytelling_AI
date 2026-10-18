@@ -214,28 +214,32 @@ export default async function coach(req: Request, context: Context) {
   const model = Netlify.env.get("GEMINI_MODEL") || "gemini-3.5-flash";
   const { systemInstruction, prompt } = body.action === 'image' ? { systemInstruction: '', prompt: '' } : promptFor(body.action, payload)!;
 
+  let imageStage = 'generation';
   try {
     const ai = new GoogleGenAI({ apiKey });
     let output: Record<string, any> | undefined;
     if (body.action === 'image') {
-      if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return response({ error: 'An approved image direction is required.' }, 400);
+      if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return response({ error: 'An approved image direction is required.', code: 'IMAGE_DIRECTION_REQUIRED' }, 400);
       const configuredModel = Netlify.env.get('GEMINI_IMAGE_MODEL');
       const imageModel = configuredModel && !configuredModel.startsWith('imagen-') ? configuredModel : 'gemini-3.1-flash-image';
       let imageProblems = '';
       for (let attempt = 0; attempt < 2; attempt++) {
+        imageStage = 'generation';
         const generated = await ai.models.generateContent({ model: imageModel, contents: imagePrompt(payload) + (imageProblems ? `\nPrevious attempt failed review: ${imageProblems}. Use a simpler composition and completely blank surfaces.` : ''), config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
         const image = generated.candidates?.flatMap(candidate => candidate.content?.parts || []).find(part => part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
-        if (!image?.data) return response({ error: 'The image could not be generated. Revise its direction or upload an image.' }, 422);
-        if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.' }, 413);
+        if (!image?.data) return response({ error: 'The image service did not return an image. Your work is safe; try again or upload an image.', code: 'IMAGE_GENERATION_UNAVAILABLE' }, 422);
+        if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.', code: 'IMAGE_TOO_LARGE' }, 413);
+        imageStage = 'review';
         const review = await ai.models.generateContent({ model, contents: [{ role: 'user', parts: [{ text: `Review this generated classroom campaign image against the approved direction and constraints. Direction: ${payload.prompt}. Story: ${payload.context || ''}. Brief: ${payload.brief || ''}. Fail if there are readable words or numbers on props, fabricated journals/training records/dates/named beneficiaries, unsupported claims, or child faces when prohibited. Abstract unrecognizable marks are acceptable. Also fail if it substitutes a static unrelated desk flat lay for an approved action or ignores the selected treatment ${payload.visualStyle || 'candid'}. Do not invent violations. Return JSON: {"usable":true,"issues":[]} with short specific issues when false.` }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }], config: { responseMimeType: 'application/json', temperature: 0.1 } });
         const imageReview = JSON.parse(cleanJson(review.text || '{}'));
+        if (typeof imageReview.usable !== 'boolean' || !Array.isArray(imageReview.issues) || imageReview.issues.some((issue: unknown) => typeof issue !== 'string')) throw new Error('Invalid image review');
         if (imageReview.usable === true && Array.isArray(imageReview.issues) && !imageReview.issues.length) {
-          output = { dataUrl: `data:${image.mimeType};base64,${image.data}`, source: 'AI-generated', model: imageModel, imageHash: hash(image.data), imageReview: { checked: true, issues: [] } };
+          output = { dataUrl: `data:${image.mimeType};base64,${image.data}`, source: 'AI-generated', model: imageModel, imageHash: hash(image.data), imageReview: { checked: true, issues: [], attempts: attempt + 1, rejectedAttempts: attempt } };
           break;
         }
         imageProblems = Array.isArray(imageReview.issues) ? imageReview.issues.join('; ') : 'Image review could not confirm the constraints.';
       }
-      if (!output) return response({ error: 'The generated image still contains unwanted text or misses the approved direction. Try a simpler visual direction, another treatment, or upload an image.' }, 422);
+      if (!output) return response({ error: 'The generated images did not pass the brief and image-safety review. Try a simpler direction or upload an image. Your work is safe.', code: 'IMAGE_REVIEW_REJECTED' }, 422);
     }
     let cleanup = 0;
     let repairIssues: string[] = [];
@@ -325,6 +329,10 @@ export default async function coach(req: Request, context: Context) {
   } catch (error) {
     const safeDiagnostics = ['Invalid editorial review', 'Incomplete AI response', 'Invalid JSON', 'No complete AI response'];
     console.error("StoryLab Gemini request failed", error instanceof Error && safeDiagnostics.includes(error.message) ? error.message : error instanceof Error ? error.name : "error");
+    if (body.action === 'image' && error instanceof Error && error.name === 'TimeoutError') return response({ error: 'The image request timed out. Your work is safe; try again.', code: 'REQUEST_TIMEOUT' }, 504);
+    if (body.action === 'image') return response(imageStage === 'review'
+      ? { error: 'Image review is temporarily unavailable. No image-safety violation was confirmed. Your work is safe; try again.', code: 'IMAGE_REVIEW_UNAVAILABLE' }
+      : { error: 'The image service is temporarily unavailable. Your work is safe; try again.', code: 'IMAGE_GENERATION_UNAVAILABLE' }, 502);
     return response({ error: "AI coaching is temporarily unavailable. Please try again." }, 502);
   }
 }

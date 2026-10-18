@@ -132,6 +132,12 @@ these records do not certify authorship or grade learning. Existing saved single
 An image failure preserves choices and prose for retry. The number checker excludes the high-five greeting
 while still checking measured compounds such as five-minute training; numerical warnings identify text to inspect.
 Run `npm run test:choices` for comparison and export regressions.
+
+For a different assignment or a shared browser, download the current work and choose New project;
+revisions within one assignment stay together. Image failures record a safe category and explanation
+(review rejected, review unavailable, generation unavailable, timeout, or other service/connection error),
+not raw provider diagnostics or rejected images. Successful internal review retries retain attempt counts
+in AI response metadata and a learning-record event. Older records cannot retroactively identify failure causes.
 Version 2.3 passes the student's selected framework into generation and editorial review. An internal
 creative guide selects the focal experience, pressure, pivotal moment and demonstrated change;
 it is not extra student work or a generated student rationale. Captions omit nonessential background,

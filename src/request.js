@@ -1,6 +1,20 @@
 export function requestFailure(message, name = 'Error') {
   const error = new Error(message); error.name = name; return error;
 }
+export function failureDetails(error) {
+  const reasons = {
+    REQUEST_TIMEOUT: ['timeout', 'The request timed out. Your work is safe; try again.'],
+    IMAGE_REVIEW_REJECTED: ['image-review-rejected', 'The image did not pass the brief and image-safety review. Try a simpler direction or upload a suitable image.'],
+    IMAGE_REVIEW_UNAVAILABLE: ['image-review-unavailable', 'The image review could not finish. This is not a confirmed image-safety violation. Try generating the image again.'],
+    IMAGE_GENERATION_UNAVAILABLE: ['image-generation-unavailable', 'The image service could not return an image. Try again or upload an image.'],
+    IMAGE_TOO_LARGE: ['image-too-large', 'The generated image was too large to use. Generate another image or upload a smaller one.'],
+    IMAGE_DIRECTION_REQUIRED: ['image-direction-required', 'Add an image direction before generating an image.'],
+  };
+  if (Object.hasOwn(reasons, error?.code)) return { failureCode: error.code, failureCategory: reasons[error.code][0], explanation: reasons[error.code][1] };
+  if (error?.name === 'TimeoutError') return { failureCategory: 'timeout', explanation: 'The request timed out. Your work is safe; try again.' };
+  if (error?.name === 'AbortError') return { failureCategory: 'canceled', explanation: 'The request was canceled. Existing work was kept.' };
+  return { failureCategory: 'service-or-connection-error', explanation: 'The request could not finish because of a service, connection or response error. Your work is safe; try again.' };
+}
 // Real timers work in browsers that do not implement AbortSignal.timeout.
 // Race the complete fetch/body-read, and ignore any response arriving after cancellation.
 export async function fetchJSON(url, options = {}, { signal, timeout = 45000 } = {}) {
@@ -22,7 +36,12 @@ export async function fetchJSON(url, options = {}, { signal, timeout = 45000 } =
       try { result = await response.json(); }
       catch { throw requestFailure('The service returned an unreadable response. Your work is safe; try again.'); }
       if (controller.signal.aborted) throw controller.signal.reason || requestFailure('Request canceled.', 'AbortError');
-      if (!response.ok) throw requestFailure(result.error || 'The request failed. Your work is safe; try again.');
+      if (!response.ok) {
+        const error = requestFailure(result.error || 'The request failed. Your work is safe; try again.');
+        error.code = result.code;
+        error.status = response.status;
+        throw error;
+      }
       return result;
     })()]);
   } finally {

@@ -12,6 +12,7 @@ const feedback = { alignment: { status: 'Aligned', summary: 'The story serves th
 const caption = 'Notebook down. Cooler door open.\nCold brew for the between-class break.\n\nFind Copperline in the campus market cooler starting October 27.\nTry a can from the cooler.';
 let requests = [];
 let failImageOnce = true;
+let rejectImageOnce = true;
 const imageBuffer = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 400; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#d9ebe3'; ctx.fillRect(0,0,400,400); ctx.fillStyle = '#194a42'; ctx.fillRect(160,100,80,180); return canvas.toDataURL('image/png'); }).catch(() => '');
 // This is an explicit fixture image, never used in a deployed student workflow.
 const image = imageBuffer || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
@@ -21,7 +22,8 @@ await page.route('**/api/coach', route => {
   if (action === 'feedback') return route.fulfill({ json: feedback });
   if (action === 'image') {
     if (failImageOnce) { failImageOnce = false; return route.fulfill({ status: 502, json: { error: 'Your work is safe; try again.' } }); }
-    return route.fulfill({ json: { dataUrl: image, source: 'AI-generated', model: 'fixture-image', _receipt: 'c'.repeat(48) } });
+    if (rejectImageOnce) { rejectImageOnce = false; return route.fulfill({ status: 422, json: { error: 'Image review rejected this image.', code: 'IMAGE_REVIEW_REJECTED' } }); }
+    return route.fulfill({ json: { dataUrl: image, source: 'AI-generated', model: 'fixture-image', imageReview: { checked: true, issues: [], attempts: 2, rejectedAttempts: 1 }, _receipt: 'c'.repeat(48) } });
   }
   if (action === 'production') return route.fulfill({ json: { summary: 'Approved production guidance.', scenes: [], accessibility: 'Use supplied image alt text and readable captions.', educatorSummary: 'Follows the approved story.' } });
   const video = payload.deliverable === 'Instagram Video Storyboard';
@@ -36,6 +38,7 @@ const state = () => page.evaluate(() => JSON.parse(localStorage.getItem('storyla
 const getDownload = async (name, target) => { const event = page.waitForEvent('download'); await page.getByRole('button', { name, exact: true }).click(); const download = await event; await download.saveAs(target); return fs.readFile(target); };
 try {
   await page.goto(process.env.STORYLAB_URL || 'http://127.0.0.1:4173');
+  assert(await page.getByText('Starting a different assignment or sharing this browser?', { exact: false }).isVisible());
   assert.equal(await page.locator('.brief-card').count(), 6);
   await page.getByRole('button', { name: 'Choose Copperline Cold Brew', exact: true }).click();
   assert.equal(await page.getByLabel('Fictional client', { exact: true }).inputValue(), briefs[0].client);
@@ -72,9 +75,16 @@ try {
   assert.deepEqual(afterFailure.content, beforeFailure.content);
   assert.deepEqual(afterFailure.arcDrafts, beforeFailure.arcDrafts);
   assert.equal(afterFailure.storyLocked, true);
-  assert(afterFailure.history.some(event => event.action === 'Request failed' && event.detail === 'image'));
+  assert(afterFailure.history.some(event => event.action === 'Request failed' && event.requestAction === 'image' && event.failureCategory === 'service-or-connection-error'));
+  await page.getByRole('button', { name: 'Generate post image', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'did not pass the brief and image-safety review' }).waitFor();
+  const afterRejection = await state();
+  assert.deepEqual(afterRejection.content, beforeFailure.content);
+  assert(afterRejection.history.some(event => event.failureCategory === 'image-review-rejected' && event.failureCode === 'IMAGE_REVIEW_REJECTED'));
+  assert.equal(await page.getByRole('button', { name: 'Try again', exact: true }).count(), 0, 'Image errors point to the image control rather than a disabled retry button.');
   await page.getByRole('button', { name: 'Generate post image', exact: true }).click();
   await page.locator('.instagram-image img').waitFor();
+  assert((await state()).history.some(event => event.action === 'Image review retry succeeded' && event.rejectedAttempts === 1));
   await page.getByLabel('Instagram username').fill('copperline.campus');
   await page.getByLabel('Location (optional)').fill('Campus market');
   await page.getByLabel('Show simulated engagement').check();
@@ -107,6 +117,8 @@ try {
   assert(staticZip['instagram-post-mockup.png']); assert(staticZip['images/post-1.png']);
   assert(strFromU8(staticZip['instructor-learning-record.html']).includes('tool-issued receipt'));
   assert(strFromU8(staticZip['instructor-learning-record.html']).includes('Storytelling comparisons and student choices'));
+  assert(strFromU8(staticZip['instructor-learning-record.html']).includes('No image-review rejection was confirmed'));
+  assert(strFromU8(staticZip['instructor-learning-record.html']).includes('Image review retry succeeded'));
   assert(strFromU8(staticZip['instructor-learning-record.html']).includes(beforeFailure.content.choiceRationale));
   assert(strFromU8(staticZip['caption-and-production-script.txt']).includes('Take a coffee pause'));
   await page.locator('.submission-panel').scrollIntoViewIfNeeded();
