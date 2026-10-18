@@ -1351,6 +1351,8 @@ main {
 #brief-review, #brief-chooser { scroll-margin-top: 120px; }
 .request-status { position: sticky; top: 80px; z-index: 25; display: flex; align-items: center; gap: 16px; padding: 16px; margin: 16px 0; border: 1px solid #1865f2; border-radius: 12px; background: #fffefa; color: var(--ink); box-shadow: var(--shadow); }
 .request-status p { margin-top: 8px; font-size: 14px; line-height: 1.5; }
+.image-request-error { position: sticky; top: 80px; z-index: 25; }
+@media (max-width: 700px) { .image-request-error { top: 64px; } }
 .request-status > div { flex: 1; }
 .confirmation-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(9,20,44,.55); display: grid; place-items: center; padding: 24px; }
 .confirmation-panel { max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }

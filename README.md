@@ -138,6 +138,13 @@ revisions within one assignment stay together. Image failures record a safe cate
 (review rejected, review unavailable, generation unavailable, timeout, or other service/connection error),
 not raw provider diagnostics or rejected images. Successful internal review retries retain attempt counts
 in AI response metadata and a learning-record event. Older records cannot retroactively identify failure causes.
+
+Requests now log start time and waiting limit; failures and cancellations include elapsed time. Image generation
+and review share a 50-second backend budget, with a 55-second fetch limit and 60-second overall workspace limit.
+The progress panel displays elapsed time and the actual limit (70 seconds for content). Client deadlines also
+check wall time on tab resume and before accepting responses, so delayed timers cannot accept expired results.
+Browsers cannot execute a timeout while a tab is suspended; the panel states that it is checked on return.
+The reliability suite covers stalled image requests, resumed tabs, late images, cancellation and retry.
 Version 2.3 passes the student's selected framework into generation and editorial review. An internal
 creative guide selects the focal experience, pressure, pivotal moment and demonstrated change;
 it is not extra student work or a generated student rationale. Captions omit nonessential background,

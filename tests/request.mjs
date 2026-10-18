@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { fetchJSON, failureDetails, requestFailure } from '../src/request.js';
+import { fetchJSON, failureDetails, requestFailure, startDeadline, requestLimit } from '../src/request.js';
 const originalFetch = globalThis.fetch;
 try {
   // The fetch implementation deliberately ignores abort: the deadline must still release the caller.
@@ -33,5 +33,28 @@ try {
   assert(!JSON.stringify(unknown).includes('raw provider'));
   globalThis.fetch = async () => ({ ok: true, json: async () => { throw new Error('HTML instead of JSON'); } });
   await assert.rejects(fetchJSON('https://test.invalid'), /unreadable response/);
+  assert.equal(requestLimit('image'), 60000); assert.equal(requestLimit('content'), 70000);
+  const originalNow = Date.now;
+  const originalDocument = globalThis.document;
+  let now = originalNow();
+  try {
+    Date.now = () => now;
+    // Simulate a suspended event loop: the response arrives after wall time expires,
+    // before the timer callback has had an opportunity to run.
+    globalThis.fetch = async () => { now += 100; return { ok: true, json: async () => ({ late: true }) }; };
+    await assert.rejects(fetchJSON('https://test.invalid', {}, { timeout: 50 }), error => error.name === 'TimeoutError');
+    globalThis.document = new EventTarget();
+    const paused = new AbortController();
+    const deadline = startDeadline(paused, 100);
+    now += 101;
+    document.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(paused.signal.reason.name, 'TimeoutError', 'Resuming a tab checks elapsed wall time, not delayed timer ticks.');
+    deadline.dispose();
+    const disposed = new AbortController();
+    const cleared = startDeadline(disposed, 100);
+    cleared.dispose(); now += 101;
+    document.dispatchEvent(new Event('visibilitychange'));
+    assert.equal(disposed.signal.aborted, false, 'Completed requests remove their resume listeners.');
+  } finally { Date.now = originalNow; if (originalDocument === undefined) delete globalThis.document; else globalThis.document = originalDocument; }
   console.log('PASS: hard deadlines for unresponsive fetch and body reads, late responses, parent cancellation, HTTP failures and malformed responses.');
 } finally { globalThis.fetch = originalFetch; }

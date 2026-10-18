@@ -215,6 +215,7 @@ export default async function coach(req: Request, context: Context) {
   const { systemInstruction, prompt } = body.action === 'image' ? { systemInstruction: '', prompt: '' } : promptFor(body.action, payload)!;
 
   let imageStage = 'generation';
+  let imageDeadline = 0;
   try {
     const ai = new GoogleGenAI({ apiKey });
     let output: Record<string, any> | undefined;
@@ -222,15 +223,23 @@ export default async function coach(req: Request, context: Context) {
       if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return response({ error: 'An approved image direction is required.', code: 'IMAGE_DIRECTION_REQUIRED' }, 400);
       const configuredModel = Netlify.env.get('GEMINI_IMAGE_MODEL');
       const imageModel = configuredModel && !configuredModel.startsWith('imagen-') ? configuredModel : 'gemini-3.1-flash-image';
+      imageDeadline = Date.now() + 50000;
+      const checkImageDeadline = () => {
+        if (Date.now() < imageDeadline) return;
+        const error = new Error('Image request timed out'); error.name = 'TimeoutError'; throw error;
+      };
+      const imageSignal = () => { checkImageDeadline(); return AbortSignal.timeout(Math.max(1, imageDeadline - Date.now())); };
       let imageProblems = '';
       for (let attempt = 0; attempt < 2; attempt++) {
         imageStage = 'generation';
-        const generated = await ai.models.generateContent({ model: imageModel, contents: imagePrompt(payload) + (imageProblems ? `\nPrevious attempt failed review: ${imageProblems}. Use a simpler composition and completely blank surfaces.` : ''), config: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
+        const generated = await ai.models.generateContent({ model: imageModel, contents: imagePrompt(payload) + (imageProblems ? `\nPrevious attempt failed review: ${imageProblems}. Use a simpler composition and completely blank surfaces.` : ''), config: { abortSignal: imageSignal(), responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
+        checkImageDeadline();
         const image = generated.candidates?.flatMap(candidate => candidate.content?.parts || []).find(part => part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
         if (!image?.data) return response({ error: 'The image service did not return an image. Your work is safe; try again or upload an image.', code: 'IMAGE_GENERATION_UNAVAILABLE' }, 422);
         if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.', code: 'IMAGE_TOO_LARGE' }, 413);
         imageStage = 'review';
-        const review = await ai.models.generateContent({ model, contents: [{ role: 'user', parts: [{ text: `Review this generated classroom campaign image against the approved direction and constraints. Direction: ${payload.prompt}. Story: ${payload.context || ''}. Brief: ${payload.brief || ''}. Fail if there are readable words or numbers on props, fabricated journals/training records/dates/named beneficiaries, unsupported claims, or child faces when prohibited. Abstract unrecognizable marks are acceptable. Also fail if it substitutes a static unrelated desk flat lay for an approved action or ignores the selected treatment ${payload.visualStyle || 'candid'}. Do not invent violations. Return JSON: {"usable":true,"issues":[]} with short specific issues when false.` }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }], config: { responseMimeType: 'application/json', temperature: 0.1 } });
+        const review = await ai.models.generateContent({ model, contents: [{ role: 'user', parts: [{ text: `Review this generated classroom campaign image against the approved direction and constraints. Direction: ${payload.prompt}. Story: ${payload.context || ''}. Brief: ${payload.brief || ''}. Fail if there are readable words or numbers on props, fabricated journals/training records/dates/named beneficiaries, unsupported claims, or child faces when prohibited. Abstract unrecognizable marks are acceptable. Also fail if it substitutes a static unrelated desk flat lay for an approved action or ignores the selected treatment ${payload.visualStyle || 'candid'}. Do not invent violations. Return JSON: {"usable":true,"issues":[]} with short specific issues when false.` }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }], config: { abortSignal: imageSignal(), responseMimeType: 'application/json', temperature: 0.1 } });
+        checkImageDeadline();
         const imageReview = JSON.parse(cleanJson(review.text || '{}'));
         if (typeof imageReview.usable !== 'boolean' || !Array.isArray(imageReview.issues) || imageReview.issues.some((issue: unknown) => typeof issue !== 'string')) throw new Error('Invalid image review');
         if (imageReview.usable === true && Array.isArray(imageReview.issues) && !imageReview.issues.length) {
@@ -329,7 +338,7 @@ export default async function coach(req: Request, context: Context) {
   } catch (error) {
     const safeDiagnostics = ['Invalid editorial review', 'Incomplete AI response', 'Invalid JSON', 'No complete AI response'];
     console.error("StoryLab Gemini request failed", error instanceof Error && safeDiagnostics.includes(error.message) ? error.message : error instanceof Error ? error.name : "error");
-    if (body.action === 'image' && error instanceof Error && error.name === 'TimeoutError') return response({ error: 'The image request timed out. Your work is safe; try again.', code: 'REQUEST_TIMEOUT' }, 504);
+    if (body.action === 'image' && ((imageDeadline > 0 && Date.now() >= imageDeadline) || (error instanceof Error && error.name === 'TimeoutError'))) return response({ error: 'The image request timed out. Your work is safe; try again.', code: 'REQUEST_TIMEOUT' }, 504);
     if (body.action === 'image') return response(imageStage === 'review'
       ? { error: 'Image review is temporarily unavailable. No image-safety violation was confirmed. Your work is safe; try again.', code: 'IMAGE_REVIEW_UNAVAILABLE' }
       : { error: 'The image service is temporarily unavailable. Your work is safe; try again.', code: 'IMAGE_GENERATION_UNAVAILABLE' }, 502);

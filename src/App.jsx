@@ -4,7 +4,7 @@ import { BRIEF_FIELDS, getField, briefText, missingBrief, missingContent } from 
 import { useProject, addEvent, edit, learningSummary } from './project';
 import { downloadFile, makeReport, outputText, reportHtml, recordDigest } from './report';
 import Verification from './Verification';
-import { fetchJSON, requestFailure, failureDetails } from './request';
+import { fetchJSON, requestFailure, failureDetails, startDeadline, requestLimit } from './request';
 import { COPY_ENGINE_VERSION, copyIssues } from '../shared/copy.mjs';
 import { presentationIssues } from '../shared/creative.mjs';
 import { applyChoice, choicesComplete, reviewChoice } from '../shared/choices.mjs';
@@ -56,6 +56,18 @@ const ARC_STRUCTURES = {
 
 const DELIVERABLES = FORMATS;
 
+function RequestProgress({ name, startedAt, timeoutMs, saveError, onCancel }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const refresh = () => setElapsed(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    refresh();
+    const timer = setInterval(refresh, 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
+  const title = { brief: 'Generating your creative brief...', feedback: 'Reviewing your story...', content: 'Generating your content draft...', image: 'Creating and checking your image...', upload: 'Saving your image...', submission: 'Preparing your submission...', production: 'Building your production package...', export: 'Preparing your verified record...', localExport: 'Preparing your local record...' }[name];
+  return <div className="request-status" role="status" aria-live="polite" aria-label="Request progress"><Spinner /><div><b>{title}</b><p>{saveError ? 'Autosave is unavailable; keep this tab open.' : 'Your work is saved in this browser.'} Waiting limit: {timeoutMs / 1000} seconds. <span aria-live="off">Elapsed: {elapsed} seconds.</span></p>{name === 'image' && elapsed >= 20 && <p>Still waiting for image generation or review. You can cancel safely and retry.</p>}<small>A paused tab checks the timeout when you return.</small></div><button className="secondary-button" onClick={onCancel}>Cancel request</button></div>;
+}
+
 function App() {
   const { project, update, reset, saveError } = useProject();
   const { stage, brief, lockedBrief, readBrief, arc, arcDrafts, feedback, storyLocked, deliverable, platform, content, contentLocked, production, history, reflection } = project;
@@ -75,9 +87,10 @@ function App() {
     const pending = activeRequest.current;
     if (!pending) return;
     activeRequest.current = null;
+    pending.deadline.dispose();
     pending.controller.abort(requestFailure(message, 'AbortError'));
     busy.current = false; setLoading(''); setError(message); setRetryAction(pending.name);
-    record('Request canceled', pending.name);
+    record('Request canceled', pending.name, { requestAction: pending.name, elapsedMs: Math.max(0, Date.now() - pending.deadline.startedAt), timeoutMs: pending.timeoutMs });
   };
   const setStage = stage => { if (stage !== project.stage) { cancelPending(); setError(''); setRetryAction(''); } update({ stage }); };
   const arcText = useMemo(() => ARC_STRUCTURES[arc].fields.map(field => `${field}: ${arcDrafts[field] || ''}`).join('\n'), [arc, arcDrafts]);
@@ -137,6 +150,7 @@ function App() {
       setVerificationWarning('Server verification is unavailable. You can keep working and download a local record. AI calls without receipts cannot be verified later.');
     }
     const result = await fetchJSON('/api/coach', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload, session }) }, { signal, timeout: action === 'image' ? 55000 : action === 'content' ? 65000 : 40000 });
+    if (activeRequest.current?.controller.signal === signal) activeRequest.current.deadline.check();
     if (signal.aborted) throw signal.reason || requestFailure('Request canceled.', 'AbortError');
     const { _receipt, _cleanup, _receiptWarning, ...output } = result;
     if (_receiptWarning) setVerificationWarning(_receiptWarning);
@@ -151,9 +165,11 @@ function App() {
   const run = async (name, operation) => {
     if (busy.current) return;
     const controller = new AbortController();
-    activeRequest.current = { name, controller };
+    const timeoutMs = requestLimit(name);
+    const deadline = startDeadline(controller, timeoutMs);
+    activeRequest.current = { name, controller, deadline, timeoutMs };
     busy.current = true; setLoading(name); setError(''); setRetryAction('');
-    const deadline = setTimeout(() => controller.abort(requestFailure('The request took too long. Your work is safe; try again.', 'TimeoutError')), name === 'image' ? 60000 : name === 'content' ? 70000 : 45000);
+    record('Request started', `${name}: waiting limit ${timeoutMs / 1000} seconds.`, { requestAction: name, timeoutMs });
     let onAbort;
     const canceled = new Promise((_, reject) => {
       onAbort = () => reject(controller.signal.reason || requestFailure('Request canceled.', 'AbortError'));
@@ -165,9 +181,9 @@ function App() {
       const details = failureDetails(failure);
       if (name === 'image' && details.failureCategory === 'service-or-connection-error') details.explanation += ' No image-review rejection was confirmed.';
       setError(name === 'image' ? `${details.explanation} Your story, captions and choices are preserved. Use Generate or Regenerate beside the image to retry.` : failure?.message || 'The request failed. Your work is safe; try again.');
-      setRetryAction(name); record('Request failed', `${name}: ${details.explanation}`, { requestAction: name, ...details });
+      setRetryAction(name); record('Request failed', `${name}: ${details.explanation}`, { requestAction: name, ...details, elapsedMs: Math.max(0, Date.now() - deadline.startedAt), timeoutMs });
     } finally {
-      clearTimeout(deadline); controller.signal.removeEventListener('abort', onAbort);
+      deadline.dispose(); controller.signal.removeEventListener('abort', onAbort);
       if (activeRequest.current?.controller === controller) { activeRequest.current = null; busy.current = false; setLoading(''); }
     }
   };
@@ -261,6 +277,7 @@ function App() {
   const storeImage = async (index, dataUrl, source, signal) => {
     const id = crypto.randomUUID();
     await saveMedia(project.projectId, id, dataUrl);
+    if (activeRequest.current?.controller.signal === signal) activeRequest.current.deadline.check();
     if (signal?.aborted) return;
     setMedia(previous => ({ ...previous, [id]: dataUrl }));
     update(previous => {
@@ -343,8 +360,8 @@ function App() {
           <button className="ghost-button" onClick={() => downloadReport(false)} disabled={Boolean(loading)}>Save a local copy of work and learning record</button>
           {saveError && <div className="error-banner" role="alert">{saveError}</div>}
           {verificationWarning && <div className="error-banner" role="status">{verificationWarning}</div>}
-          {loading && <div className="request-status" role="status" aria-live="polite" aria-label="Request progress"><Spinner /><div><b>{({ brief: 'Generating your creative brief…', feedback: 'Reviewing your story…', content: 'Generating your content draft…', image: 'Creating your image…', upload: 'Saving your image…', submission: 'Preparing your submission…', production: 'Building your production package…', export: 'Preparing your verified record…', localExport: 'Preparing your local record…' })[loading]}</b><p>{saveError ? "Autosave is unavailable; keep this tab open." : "Your work is saved in this browser."} This request will stop within {loading === 'image' ? '60' : '45'} seconds.</p></div><button className="secondary-button" onClick={() => cancelPending()}>Cancel request</button></div>}
-          {error && <div className="error-banner" id="request-error" role="alert">{error} {retryAction !== 'image' && <button className="secondary-button" disabled={Boolean(loading) || !canRetry} onClick={retry}>Try again</button>}</div>}
+          {loading && <RequestProgress key={activeRequest.current?.deadline.startedAt} name={loading} startedAt={activeRequest.current?.deadline.startedAt} timeoutMs={requestLimit(loading)} saveError={saveError} onCancel={() => cancelPending()} />}
+          {error && <div className={`error-banner ${retryAction === 'image' ? 'image-request-error' : ''}`} id="request-error" role="alert">{error} {retryAction !== 'image' && <button className="secondary-button" disabled={Boolean(loading) || !canRetry} onClick={retry}>Try again</button>}</div>}
           <div className="workspace-controls">
           <StageNav stage={stage} canVisit={canVisit} onSelect={setStage} />
 

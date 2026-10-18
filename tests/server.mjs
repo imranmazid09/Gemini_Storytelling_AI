@@ -133,6 +133,8 @@ assert.equal(response.status, 200); assert(output.copyReview.issues.some(issue =
 __responses.push({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: 'aGVsbG8=' } }] } }] }, { usable: true, issues: [] });
 response = await coach(request({ action: 'image', payload: { prompt: 'Notebook beside a can.', aspectRatio: '1:1' }, session }), context); output = await response.json();
 assert.equal(response.status, 200); assert.equal(output.model, 'gemini-3.1-flash-image'); assert(output._receipt); assert(output.dataUrl.startsWith('data:image/png;base64,'));
+assert(__prompts.at(-2).config.abortSignal instanceof AbortSignal, 'Image generation receives the shared deadline signal.');
+assert(__prompts.at(-1).config.abortSignal instanceof AbortSignal, 'Image review receives the remaining deadline signal.');
 const { dataUrl, _receipt, _cleanup, _receiptWarning, ...imageMetadata } = output;
 const storedImageCall = [...__blobs.entries()].find(([key]) => key.endsWith(`calls/${_receipt}`))?.[1];
 assert.equal(storedImageCall.outputHash, createHash('sha256').update(JSON.stringify(imageMetadata)).digest('hex'), 'Image call metadata must match retained report output.');
@@ -159,6 +161,19 @@ const timeout = new Error('Private provider timeout'); timeout.name = 'TimeoutEr
 __responses.push(timeout);
 response = await coach(request({ action: 'image', payload: { prompt: 'Hands over a blank book.' }, session }), context); output = await response.json();
 assert.equal(response.status, 504); assert.equal(output.code, 'REQUEST_TIMEOUT');
+const originalNow = Date.now;
+let now = originalNow();
+try {
+  Date.now = () => now;
+  const start = __prompts.length;
+  __responses.push(() => { now += 51000; return generatedImage; });
+  response = await coach(request({ action: 'image', payload: { prompt: 'Hands over a blank book.' }, session }), context); output = await response.json();
+  assert.equal(response.status, 504); assert.equal(output.code, 'REQUEST_TIMEOUT');
+  assert.equal(__prompts.length - start, 1, 'An image arriving past the shared budget must not start another review or retry.');
+  __responses.push(() => { now += 51000; const error = new Error('SDK aborted'); error.name = 'AbortError'; throw error; });
+  response = await coach(request({ action: 'image', payload: { prompt: 'Hands over a blank book.' }, session }), context); output = await response.json();
+  assert.equal(output.code, 'REQUEST_TIMEOUT', 'SDK abort errors after the deadline are recorded as timeouts, not service failures.');
+} finally { Date.now = originalNow; }
 console.log('PASS: content repair, image action with receipt, image privacy, and complete draft validation.');
 await fs.rm('.test-functions', { recursive: true });
 console.log('PASS: complete brief validation/retry, invalid JSON retry, duplicate regeneration/cleanup, hook gating, verification sessions, foreign receipts, privacy, edit coalescing.');
