@@ -11,6 +11,7 @@ const briefs = JSON.parse(await fs.readFile('src/prebuilt-creative-briefs.json',
 const feedback = { alignment: { status: 'Aligned', summary: 'The story serves the brief.', missingLink: '' }, storyReadiness: { status: 'Ready for content', summary: 'A concrete student moment.', priority: '' }, connection: 'The audience can enter the scene.', responsibility: 'Use supplied facts.', beats: ['Setup', 'Tension', 'Resolution'].map(stage => ({ stage, sharpen: `Clarify ${stage}.` })), questions: ['What changes for this student?'], rubric: [{ label: 'Focal viewpoint', level: 'Strong' }] };
 const caption = 'Notebook down. Cooler door open.\nCold brew for the between-class break.\n\nFind Copperline in the campus market cooler starting October 27.\nTry a can from the cooler.';
 let requests = [];
+let failImageOnce = true;
 const imageBuffer = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 400; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#d9ebe3'; ctx.fillRect(0,0,400,400); ctx.fillStyle = '#194a42'; ctx.fillRect(160,100,80,180); return canvas.toDataURL('image/png'); }).catch(() => '');
 // This is an explicit fixture image, never used in a deployed student workflow.
 const image = imageBuffer || 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
@@ -18,13 +19,18 @@ await page.route('**/api/record*', route => { const body = route.request().postD
 await page.route('**/api/coach', route => {
   const { action, payload } = route.request().postDataJSON(); requests.push({ action, payload });
   if (action === 'feedback') return route.fulfill({ json: feedback });
-  if (action === 'image') return route.fulfill({ json: { dataUrl: image, source: 'AI-generated', model: 'fixture-image', _receipt: 'c'.repeat(48) } });
+  if (action === 'image') {
+    if (failImageOnce) { failImageOnce = false; return route.fulfill({ status: 502, json: { error: 'Your work is safe; try again.' } }); }
+    return route.fulfill({ json: { dataUrl: image, source: 'AI-generated', model: 'fixture-image', _receipt: 'c'.repeat(48) } });
+  }
   if (action === 'production') return route.fulfill({ json: { summary: 'Approved production guidance.', scenes: [], accessibility: 'Use supplied image alt text and readable captions.', educatorSummary: 'Follows the approved story.' } });
   const video = payload.deliverable === 'Instagram Video Storyboard';
   const count = video ? Number(payload.sceneCount) : 1;
   const total = Number(payload.duration);
   const frames = Array.from({ length: count }, (_, i) => ({ title: `The break ${i + 1}`, visual: 'Notebook beside a cold brew can.', copy: video ? 'A pause between classes.' : 'A between-class break.', time: video ? `${i * total / count}-${(i + 1) * total / count} seconds` : 'Image 1', audio: video ? 'Ambient campus sound.' : 'Not applicable', onScreen: 'A between-class break', altText: 'Can beside a notebook.' }));
-  return route.fulfill({ json: { primaryText: caption, headline: 'A between-class break', cta: 'Try a can from the cooler.', visualDirection: frames[0].visual, altText: frames[0].altText, ethicalCheck: 'Supplied fictional facts only.', frames, copyReview: { issues: [] } } });
+  const captionVariants = ['The pause', 'A small choice', 'The cooler moment'].map((label, index) => ({ label, primaryText: index === 0 ? caption : caption.replace('Notebook down. Cooler door open.', index === 1 ? 'The next class can wait a moment.' : 'A notebook closes. The cooler opens.') }));
+  const imageConcepts = [{ label: 'At the cooler', visual: frames[0].visual, altText: frames[0].altText, onScreen: '' }, { label: 'The pause outside', visual: 'A student pauses outside with a can beside their closed notebook.', altText: 'A student and a closed notebook outside.', onScreen: '' }];
+  return route.fulfill({ json: { primaryText: caption, headline: 'A between-class break', cta: 'Try a can from the cooler.', visualDirection: frames[0].visual, altText: frames[0].altText, ethicalCheck: 'Supplied fictional facts only.', frames, choicesRequired: true, captionVariants, ...(video ? {} : { imageConcepts }), copyReview: { issues: [] } } });
 });
 const state = () => page.evaluate(() => JSON.parse(localStorage.getItem('storylab-project-v2')));
 const getDownload = async (name, target) => { const event = page.waitForEvent('download'); await page.getByRole('button', { name, exact: true }).click(); const download = await event; await download.saveAs(target); return fs.readFile(target); };
@@ -45,6 +51,28 @@ try {
   assert(await page.getByLabel('Creative energy', { exact: true }).isVisible());
   assert(await page.getByLabel('Image treatment', { exact: true }).isVisible());
   assert(await page.getByRole('button', { name: 'Approve and review submission', exact: true }).isDisabled());
+  assert.equal(await page.getByRole('radio').count(), 5);
+  assert.equal(await page.getByRole('radio', { checked: true }).count(), 0, 'No storytelling treatment is preselected.');
+  assert(await page.getByRole('button', { name: 'Generate post image', exact: true }).isDisabled());
+  await page.getByRole('radio').nth(1).check();
+  await page.getByRole('radio').nth(4).check();
+  await page.getByLabel('Why these choices? (optional)', { exact: true }).fill('The small pause feels familiar between classes; the outside image adds context instead of repeating the caption.');
+  await page.locator('.story-choices').first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/private/tmp/storylab-comparison-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Comparison cards fit narrow mobile screens.');
+  await page.locator('.story-choices').first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: '/private/tmp/storylab-comparison-mobile.png' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const beforeFailure = await state();
+  assert(!beforeFailure.history.some(event => event.action === 'Edited' && event.detail.startsWith('Content:')), 'Selections are recorded as decisions, not student copy edits.');
+  await page.getByRole('button', { name: 'Generate post image', exact: true }).click();
+  await page.getByRole('alert').filter({ hasText: 'Your work is safe' }).waitFor();
+  const afterFailure = await state();
+  assert.deepEqual(afterFailure.content, beforeFailure.content);
+  assert.deepEqual(afterFailure.arcDrafts, beforeFailure.arcDrafts);
+  assert.equal(afterFailure.storyLocked, true);
+  assert(afterFailure.history.some(event => event.action === 'Request failed' && event.detail === 'image'));
   await page.getByRole('button', { name: 'Generate post image', exact: true }).click();
   await page.locator('.instagram-image img').waitFor();
   await page.getByLabel('Instagram username').fill('copperline.campus');
@@ -57,6 +85,16 @@ try {
   const imageSource = (await state()).assets[0].id;
   await page.reload(); await page.locator('.instagram-image img').waitFor();
   assert.equal((await state()).assets[0].id, imageSource);
+  assert.equal((await state()).content.selectedCaption, 1);
+  assert.equal((await state()).content.selectedConcept, 1);
+  assert.equal((await state()).content.choiceRationale, beforeFailure.content.choiceRationale);
+  await page.getByRole('radio').nth(3).click();
+  await page.getByRole('button', { name: 'Keep my work', exact: true }).click();
+  assert.equal((await state()).assets[0].id, imageSource, 'Canceling a concept switch keeps the existing image.');
+  await page.getByRole('radio').nth(3).click();
+  await page.getByRole('button', { name: 'Confirm change', exact: true }).click();
+  assert.equal((await state()).assets.length, 0, 'A confirmed new concept cannot retain an unrelated image.');
+  assert(await page.getByRole('button', { name: 'Approve and review submission', exact: true }).isDisabled());
   assert.equal(await page.getByLabel('Instagram username').inputValue(), 'copperline.campus');
   await page.locator('.upload-control').filter({ hasText: 'Upload post image' }).locator('input').setInputFiles({ name: 'student-image.png', mimeType: 'image/png', buffer: Buffer.from(image.split(',')[1], 'base64') });
   await page.waitForFunction(() => JSON.parse(localStorage.getItem('storylab-project-v2')).assets[0]?.source === 'Student-uploaded');
@@ -68,6 +106,8 @@ try {
   const staticZip = unzipSync(await getDownload('Download verified submission ZIP', '/private/tmp/storylab-instagram-submission.zip'));
   assert(staticZip['instagram-post-mockup.png']); assert(staticZip['images/post-1.png']);
   assert(strFromU8(staticZip['instructor-learning-record.html']).includes('tool-issued receipt'));
+  assert(strFromU8(staticZip['instructor-learning-record.html']).includes('Storytelling comparisons and student choices'));
+  assert(strFromU8(staticZip['instructor-learning-record.html']).includes(beforeFailure.content.choiceRationale));
   assert(strFromU8(staticZip['caption-and-production-script.txt']).includes('Take a coffee pause'));
   await page.locator('.submission-panel').scrollIntoViewIfNeeded();
   await page.screenshot({ path: '/private/tmp/storylab-instagram-review.png' });
@@ -84,6 +124,8 @@ try {
   await page.getByLabel('Custom caption word limit').fill('75');
   await page.getByRole('button', { name: 'Generate Instagram draft', exact: true }).click();
   await page.getByLabel('Scene 1 script / voiceover').waitFor();
+  assert.equal(await page.getByRole('radio').count(), 3);
+  await page.getByRole('radio').nth(0).check();
   for (let i = 1; i <= 4; i++) {
     await page.getByRole('button', { name: `Generate scene ${i} image`, exact: true }).click();
     await page.getByRole('button', { name: `Regenerate scene ${i} image`, exact: true }).waitFor();
@@ -91,6 +133,7 @@ try {
   }
   await page.getByRole('button', { name: 'Approve and review submission', exact: true }).click();
   await page.getByRole('heading', { name: 'Approved video storyboard', exact: true }).waitFor();
+  assert.equal((await state()).history.filter(event => event.action === 'Content approved').at(-1).unchanged, true, 'Selecting AI treatments alone must not be labeled a student copy edit.');
   const videoZip = unzipSync(await getDownload('Download local submission ZIP', '/private/tmp/storylab-video-submission.zip'));
   assert(videoZip['illustrated-storyboard.html']);
   assert.equal(Object.keys(videoZip).filter(name => name.startsWith('images/')).length, 4);
@@ -100,6 +143,7 @@ try {
   const lastContent = requests.filter(request => request.action === 'content').at(-1);
   assert.equal(lastContent.payload.duration, 20); assert.equal(lastContent.payload.length, '75');
   assert.equal(lastContent.payload.storyFramework, 'threeAct', 'Content generation receives the student-selected framework.');
+  assert.equal(lastContent.payload.requireChoices, true);
   await page.locator('.storyboard-grid').scrollIntoViewIfNeeded(); await page.screenshot({ path: '/private/tmp/storylab-video-review.png' });
   assert.deepEqual(errors, []);
   console.log('PASS: unchanged brief selection, story-only progression, full Instagram mockup, persisted image recovery, custom caption/duration, every storyboard scene, PNG and verified/local ZIP contents, mobile layout and no hook requests.');

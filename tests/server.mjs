@@ -118,6 +118,18 @@ globalThis.__reviews = [{ issues: ['Replace the generic opening with the specifi
 __responses.push(narrativeDraft, new Error('Simulated repair timeout'));
 response = await coach(request({ action: 'content', payload: narrativePayload, session }), context); output = await response.json();
 assert.equal(response.status, 200); assert.equal(output.primaryText, narrativeDraft.primaryText); assert(output.copyReview.issues.length, 'A failed repair must preserve the complete flagged draft.');
+const comparisonDraft = { ...narrativeDraft, captionVariants: ['Maya nearly leaves. Then come the dinosaurs.', 'The dinosaur book changes her mind.', 'She came unsure. She stays for the semester.'].map((opening, index) => ({ label: ['The hesitation', 'The turning point', 'The decision'][index], primaryText: `${opening}\nAfter laughing together she signs up for the semester.\nSign up for training.` })), imageConcepts: [{ label: 'The shared laugh', visual: 'A volunteer laughs as a child points at dinosaur illustrations.', altText: 'A shared laugh over a dinosaur book.', onScreen: '' }, { label: 'The choice to stay', visual: 'Maya opens her notebook to sign up for the semester after reading together.', altText: 'A volunteer choosing to return.', onScreen: '' }] };
+globalThis.__reviews = [{ issues: [], omitOverlay: false }];
+__responses.push(comparisonDraft);
+response = await coach(request({ action: 'content', payload: { ...narrativePayload, requireChoices: true }, session }), context); output = await response.json();
+assert.equal(response.status, 200); assert.deepEqual(output.copyReview.issues, []);
+assert.equal(output.captionVariants.length, 3); assert.equal(output.imageConcepts.length, 2);
+assert.equal(output.choicesRequired, true); assert.equal(output.selectedCaption, undefined);
+assert(JSON.parse(__prompts.at(-1).contents).comparisonReview.includes('ALL three'));
+const badComparison = { ...comparisonDraft, captionVariants: comparisonDraft.captionVariants.map((option, index) => index === 2 ? { ...option, primaryText: '999 volunteers.\nSign up for training.' } : option) };
+__responses.push(badComparison, new Error('Simulated repair failure'));
+response = await coach(request({ action: 'content', payload: { ...narrativePayload, requireChoices: true }, session }), context); output = await response.json();
+assert.equal(response.status, 200); assert(output.copyReview.issues.some(issue => issue.includes('Caption option 3') && issue.includes('999')), 'Unselected alternatives receive the same claim checks.');
 __responses.push({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: 'aGVsbG8=' } }] } }] }, { usable: true, issues: [] });
 response = await coach(request({ action: 'image', payload: { prompt: 'Notebook beside a can.', aspectRatio: '1:1' }, session }), context); output = await response.json();
 assert.equal(response.status, 200); assert.equal(output.model, 'gemini-3.1-flash-image'); assert(output._receipt); assert(output.dataUrl.startsWith('data:image/png;base64,'));

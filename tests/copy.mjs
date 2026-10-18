@@ -30,6 +30,14 @@ assert(copyIssues(base, { ...settings, length: 3 }).some(issue => issue.includes
 assert(copyIssues({ ...base, headline: 'Twenty ideas. Zero plans.' }, settings).some(issue => issue.includes('20')), 'Spelled-out invented quantities must not bypass the approved-number check.');
 assert(!copyIssues({ ...base, headline: 'Read through one unbroken corner.' }, settings).some(issue => issue.includes('approved brief or story: 1')), 'Indefinite narrative language is not an unsupported statistic.');
 assert(copyIssues({ ...base, headline: 'A one-hour repair.' }, settings).some(issue => issue.includes('approved brief or story: 1')), 'An unsupported one-hour promise must still fail.');
+for (const greeting of ['high-five', 'high-fives', 'high-fived', 'high-fiving', 'high\u2011five', 'High-Five']) {
+  assert(!copyIssues({ ...base, headline: `We shared a ${greeting}.` }, settings).some(issue => issue.includes('approved brief or story: 5')), `${greeting} is a greeting, not an unsupported quantity.`);
+}
+for (const promise of ['five-minute repair', 'five hours', '5 repairs']) {
+  const issue = copyIssues({ ...base, headline: promise }, settings).find(issue => issue.includes('approved brief or story: 5'));
+  assert(issue, `${promise} remains a numerical claim.`);
+  assert(issue.includes('Check "'), 'Identify the offending text, not only its converted number.');
+}
 assert(!copyIssues({ ...base, headline: '1 shoreline.' }, { ...settings, story: 'A student looks toward one shoreline.' }).some(issue => issue.includes('approved brief or story: 1')), 'Written source quantities still authorize their numeric form.');
 const video = { ...base, frames: [0,1,2].map(index => ({ copy: 'A student pauses.', onScreen: '', time: `${index * 5}-${(index + 1) * 5} seconds` })) };
 assert.deepEqual(sceneTimes('0:00 - 0:07'), [0, 7]);

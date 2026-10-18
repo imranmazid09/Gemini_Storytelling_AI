@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { presentationIssues, narrativeIssues } from '../shared/creative.mjs';
+import { choiceIssues } from '../shared/choices.mjs';
 const origin = process.env.STORYLAB_URL || 'https://instagram-review--dr-imran-story-lab.netlify.app';
 const briefs = JSON.parse(await fs.readFile('src/prebuilt-creative-briefs.json', 'utf8')).briefs;
 // Fictional test stories, never substituted for a student's own work.
@@ -28,14 +29,15 @@ if (process.env.STORYLAB_EXTENDED === '1') {
   const brief = briefs.find(item => item.id === 'read-to-rise');
   cases.push({ id: 'weak-source', brief, framework: 'threeAct', story: 'Read to Rise offers two-hour volunteer training and weekly one-hour reading sessions on campus. Students can participate without previous experience. The program pairs trained college volunteers with elementary students. Training is available for students who want to help. Sign up for training.', expectFlag: true });
   cases.push({ id: 'video-turn', brief, framework: 'threeAct', story: stories['read-to-rise'], video: true });
+  cases.push({ id: 'high-five', brief, framework: 'threeAct', story: "Setup: My reading buddy brings a dinosaur backpack and reads the dragon lines in a gravelly voice. Tension: A tricky page makes him hesitate. We sound out the words together in silly voices until the dragon roar comes out right. Resolution: We share a high-five so enthusiastic his backpack bounces. He asks for the dragon book again. The volunteer feels ready to come back next week." });
 }
 for (const test of cases) {
   const { brief } = test;
-  const payload = { briefFields: brief, brief: JSON.stringify(brief), story: test.story, storyFramework: test.framework, deliverable: test.video ? 'Instagram Video Storyboard' : 'Instagram Image Post', sceneCount: 4, duration: 30, platform: 'Instagram', length: 100, hashtags: false, emojis: false, creativeEnergy: 'Lively and relatable', visualStyle: 'graphic' };
+  const payload = { briefFields: brief, brief: JSON.stringify(brief), story: test.story, storyFramework: test.framework, requireChoices: true, deliverable: test.video ? 'Instagram Video Storyboard' : 'Instagram Image Post', sceneCount: 4, duration: 30, platform: 'Instagram', length: 100, hashtags: false, emojis: false, creativeEnergy: 'Lively and relatable', visualStyle: 'graphic' };
   const start = Date.now();
   try {
     const output = await post('/api/coach', { action: 'content', session, payload });
-    const issues = [...new Set([...(output.copyReview?.issues || []), ...presentationIssues(output, payload)])];
+    const issues = [...new Set([...(output.copyReview?.issues || []), ...presentationIssues(output, payload), ...choiceIssues(output, payload)])];
     if (test.video && !/\bsemester\b/i.test(output.frames.map(frame => frame.copy + ' ' + frame.visual).join(' '))) issues.push('The source-specific semester commitment is missing from the actual storyboard scenes.');
     const expected = test.expectFlag ? issues.length > 0 && /source|approved story|student.*story/i.test(issues.join(' ')) : issues.length === 0;
     results.push({ id: test.id, expected, seconds: (Date.now() - start) / 1000, payload, output, issues, sourceMappingIssues: output.storyTrace ? narrativeIssues(output, payload) : [] });

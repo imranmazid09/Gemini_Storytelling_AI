@@ -1395,6 +1395,11 @@ main {
 .profile-settings .field { margin: 16px 0; }
 .scene-editor { display: grid; gap: 16px; border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
 .scene-editor legend { font-weight: 700; font-size: 14px; padding: 0 8px; }
+.story-choice { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer; min-width: 0; }
+.story-choice:has(input:checked) { outline: 2px solid var(--brand-action, #1865f2); outline-offset: 1px; }
+.story-choice:focus-within { outline: 2px solid var(--brand-action, #1865f2); outline-offset: 3px; }
+.story-choice input { width: auto; min-height: auto; }
+.choice-copy { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
 .asset-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .asset-buttons button, .upload-control { min-height: 48px; }
 .upload-control { display: flex; align-items: center; justify-content: center; position: relative; gap: 8px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; font-size: 14px; background: white; cursor: pointer; overflow: hidden; }

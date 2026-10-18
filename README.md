@@ -123,6 +123,15 @@ unlock and every structure selector, including browsers without native dialogs o
 ### Evidence-supported copy engine
 
 `copy-engine/v1.json` versions the prompt, safe examples, banned language and Instagram format guidance.
+
+Copy engine 2.4 adds three complete caption treatments for explicit student comparison and, for image posts,
+two distinct still-image concepts. All alternatives receive literal claim/presentation checks and the same
+batch editorial review. Students select before approval, may edit freely, and can explain their choice in
+their own words. The instructor record retains alternatives, selections, revisions and optional explanation;
+these records do not certify authorship or grade learning. Existing saved single-draft projects remain usable.
+An image failure preserves choices and prose for retry. The number checker excludes the high-five greeting
+while still checking measured compounds such as five-minute training; numerical warnings identify text to inspect.
+Run `npm run test:choices` for comparison and export regressions.
 Version 2.3 passes the student's selected framework into generation and editorial review. An internal
 creative guide selects the focal experience, pressure, pivotal moment and demonstrated change;
 it is not extra student work or a generated student rationale. Captions omit nonessential background,

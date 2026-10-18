@@ -1,6 +1,7 @@
 import type { Config, Context } from "@netlify/functions";
 import copyEngine from '../../copy-engine/v1.json' with { type: 'json' };
 import { copyTask, copyIssues } from '../../shared/copy.mjs';
+import { choiceIssues } from '../../shared/choices.mjs';
 import { campaignTypeIssues, narrativeIssues, presentationIssues, repeatsCaption, imagePrompt, normalizeGeneratedTypography } from '../../shared/creative.mjs';
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
@@ -150,6 +151,8 @@ For Instagram Video Storyboard, return exactly the requested sceneCount. Every s
 When hashtags is false, do not add hashtags. When true, add a few relevant hashtags after the CTA on a separate line. Include emojis only when emojis is true. Never invent engagement statistics.`,
         prompt: `${copyTask(payload)}
 Create an editable social content draft.
+${payload.requireChoices ? `Also return captionVariants: exactly three objects {"label":"short treatment name","primaryText":"complete caption"}. Each must carry the SAME approved story, required facts and final CTA within the word limit, but use a meaningfully different opening, emphasis or narrative distance, not synonym swaps. Keep framework and tone. primaryText at top level must equal the first variant. Never invent student rationale or select an option for them.
+${payload.deliverable === 'Instagram Image Post' ? 'Also return imageConcepts: exactly two objects {"label":"short concept name","visual":"complete still-image direction","altText":"accessible description","onScreen":"optional overlay or empty string"}. Show different story-grounded actions, viewpoints or compositions, not unrelated props or different filters. Each must complement all three captions and honor privacy. Leave overlays empty unless they add a genuinely different thought. The first concept must match the top-level frame.' : 'Keep one coherent timed storyboard; caption alternatives must match its actual scenes.'}` : ''}
 ${context}
 Return JSON shaped as:
 {
@@ -262,12 +265,19 @@ export default async function coach(req: Request, context: Context) {
       if (!validateResult(body.action, deduped.result, payload)) { if (!attempt) { repairIssues = body.action === 'brief' && campaignTypeIssues(deduped.result).length ? campaignTypeIssues(deduped.result) : ['Complete all required fields and structured frames/cards.']; previousDraft = JSON.stringify(deduped.result); continue; } if (bestCopy) { output = { ...bestCopy.draft, aiGenerated: true, copyEngineVersion: copyEngine.version, copyReview: { version: copyEngine.version, issues: bestCopy.issues } }; cleanup = bestCopy.cleanup; break; } throw new Error('Incomplete AI response'); }
       if (body.action === 'content' && String(payload.deliverable || '').startsWith('Instagram ')) {
         deduped.result.cta = deduped.result.primaryText.split('\n').map((line: string) => line.trim()).filter((line: string) => line && !line.startsWith('#')).at(-1);
+        if (payload.deliverable === 'Instagram Image Post') deduped.result.frames[0].copy = deduped.result.headline;
       }
       if (body.action === 'content' && payload.deliverable === 'Instagram Image Post' && repeatsCaption(deduped.result.frames[0].onScreen, deduped.result)) {
         deduped.result.frames[0].onScreen = '';
         deduped.result.creativeNotes = ['A repetitive image overlay was omitted. The image can carry the moment without extra text.'];
       }
-      const issues = body.action === 'content' ? [...copyIssues(deduped.result, payload), ...presentationIssues(deduped.result, payload)] : [];
+      if (body.action === 'content' && payload.requireChoices) {
+        deduped.result.choicesRequired = true;
+        delete deduped.result.selectedCaption;
+        delete deduped.result.selectedConcept;
+        delete deduped.result.choiceRationale;
+      }
+      const issues = body.action === 'content' ? [...copyIssues(deduped.result, payload), ...presentationIssues(deduped.result, payload), ...choiceIssues(deduped.result, payload)] : [];
       if (body.action === 'content' && deduped.result.storyTrace) {
         const mappingIssues = narrativeIssues(deduped.result, payload);
         if (mappingIssues.length) deduped.result.sourceMappingIssues = mappingIssues;
@@ -277,7 +287,7 @@ export default async function coach(req: Request, context: Context) {
         try {
           const review = await ai.models.generateContent({
             model,
-            contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, storyFramework: payload.storyFramework, frameworkGuidance: copyEngine.frameworks[String(payload.storyFramework) as keyof typeof copyEngine.frameworks], format: payload.deliverable, creativeEnergy: payload.creativeEnergy, candidate: deduped.result }),
+            contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, storyFramework: payload.storyFramework, frameworkGuidance: copyEngine.frameworks[String(payload.storyFramework) as keyof typeof copyEngine.frameworks], format: payload.deliverable, creativeEnergy: payload.creativeEnergy, ...(payload.requireChoices ? { comparisonReview: 'Review ALL three captionVariants and ' + (payload.deliverable === 'Instagram Image Post' ? 'both imageConcepts. Concepts must be meaningfully different story-grounded compositions.' : 'the actual timed storyboard scenes. Video does not require alternative image concepts.') + ' Flag generic or interchangeable variants, invented events, unsupported claims or privacy violations in any option. All options must preserve the same approved story and serve the audience. Do not demand different events when the source supplies only one moment. Optional overlays may be omitted when pairing options; do not fail on simple caption repetition that can be omitted.' } : {}), candidate: deduped.result }),
             config: { systemInstruction: copyEngine.editorialReview, temperature: 0.1, responseMimeType: 'application/json', abortSignal: AbortSignal.timeout(remaining()), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: model.startsWith('gemini-3.5-flash') ? ThinkingLevel.MEDIUM : ThinkingLevel.LOW } } : {}), responseJsonSchema: { type: 'object', properties: { issues: { type: 'array', items: { type: 'string' }, maxItems: 4 }, omitOverlay: { type: 'boolean' } }, required: ['issues', 'omitOverlay'], additionalProperties: false } },
           });
           const checked = JSON.parse(cleanJson(review.text || '{}'));

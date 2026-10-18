@@ -3,6 +3,8 @@ export const COPY_ENGINE_VERSION = config.version;
 const normalize = text => String(text || '').toLowerCase().replace(/[’‘]/g, "'").replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
 const numberWords = { zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100, thousand: 1000 };
 const numberText = (text, allowIndefiniteOne = false) => String(text || '').replace(/\b[a-z]+\b/gi, (word, offset, source) => {
+  // A greeting is not a quantity. Keep measured compounds such as five-minute checkable.
+  if (word.toLowerCase() === 'five' && /\bhigh[-\u2010-\u2014]$/i.test(source.slice(0, offset))) return word;
   // Indefinite "one" is narrative grammar; timed or measured promises still need source support.
   if (allowIndefiniteOne && word.toLowerCase() === 'one' && !/^[\s-]*(?:seconds?|minutes?|hours?|days?|weeks?|months?|years?|percent|dollars?|pounds?|miles?|times?)\b/i.test(source.slice(offset + word.length))) return word;
   return Object.hasOwn(numberWords, word.toLowerCase()) ? String(numberWords[word.toLowerCase()]) : word;
@@ -66,7 +68,11 @@ export function copyIssues(result, payload) {
   if (/\b(crowded|crowding|queues?|waiting|endless searching)\b/i.test(creative) && !/\b(crowded|crowding|queues?|waiting|endless searching)\b/i.test(narrativeSource)) issues.push('Remove crowding, queues or waiting not supplied in the brief or approved story.');
   const approvedNumbers = new Set(numberText(source).match(/\b\d+(?:[.,]\d+)?\b/g) || []);
   const newNumbers = [...new Set((numberText(creative, true).match(/\b\d+(?:[.,]\d+)?\b/g) || []).filter(number => !approvedNumbers.has(number)))];
-  if (newNumbers.length) issues.push(`Remove numbers not in the approved brief or story: ${newNumbers.join(', ')}.`);
+  if (newNumbers.length) {
+    const phrases = creative.match(/\b(?:\d+(?:[.,]\d+)?|[a-z]+(?:-[a-z]+)*)\b/gi) || [];
+    const examples = phrases.filter(phrase => (numberText(phrase, true).match(/\b\d+(?:[.,]\d+)?\b/g) || []).some(number => newNumbers.includes(number)));
+    issues.push(`Remove numbers not in the approved brief or story: ${newNumbers.join(', ')}.${examples.length ? ` Check "${[...new Set(examples)].slice(0, 3).join('", "')}".` : ''}`);
+  }
   if (!/\d/.test(creative) && !['client', 'audience', 'mandatory'].some(key => String(brief[key] || '').split(/\s+/).some(word => word.length > 4 && normalize(creative).includes(normalize(word))))) issues.push('Include a concrete detail from the approved brief or story.');
   const mandatory = String(brief.mandatory || '').split(/include:/i).at(-1).replace(/This is a fictional classroom address\./i, '').trim();
   const words = normalize(mandatory).replace(/oct\b/g, 'october').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(word => word.length > 3 || /^\d+$/.test(word));

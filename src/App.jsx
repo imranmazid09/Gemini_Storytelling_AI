@@ -7,6 +7,7 @@ import Verification from './Verification';
 import { fetchJSON, requestFailure } from './request';
 import { COPY_ENGINE_VERSION, copyIssues } from '../shared/copy.mjs';
 import { presentationIssues } from '../shared/creative.mjs';
+import { applyChoice, choicesComplete, reviewChoice } from '../shared/choices.mjs';
 import { InstagramStudio, InstagramReview, FORMATS, lengthFor, assetsComplete } from './InstagramStudio';
 import { readMedia, saveMedia, prepareUpload } from './media';
 import { submissionZip } from './submission';
@@ -206,24 +207,41 @@ function App() {
     if (busy.current) return;
     if (content && !await askConfirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
     run('content', async signal => {
-      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, storyFramework: arc, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform: 'Instagram', creativeEnergy: project.creativeEnergy, visualStyle: project.visualStyle, length: lengthFor(project), duration: Number(project.duration === 'Other' ? project.customDuration : project.duration), sceneCount: Number(project.sceneCount), hashtags: project.hashtags, emojis: project.emojis }, signal);
+      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, storyFramework: arc, requireChoices: true, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform: 'Instagram', creativeEnergy: project.creativeEnergy, visualStyle: project.visualStyle, length: lengthFor(project), duration: Number(project.duration === 'Other' ? project.customDuration : project.duration), sceneCount: Number(project.sceneCount), hashtags: project.hashtags, emojis: project.emojis }, signal);
       update({ content: result, contentLocked: false, production: null, assets: [] }); record('Content draft loaded', `Instagram ${deliverable}`);
     });
   };
+  const contentReviewPayload = previous => ({ briefFields: previous.lockedBrief, brief: briefText(previous.lockedBrief), story: arcText, deliverable: DELIVERABLES.find(item => item.id === previous.deliverable)?.name, length: lengthFor(previous), duration: Number(previous.duration === 'Other' ? previous.customDuration : previous.duration), sceneCount: Number(previous.sceneCount), hashtags: previous.hashtags, emojis: previous.emojis });
   const updateContent = next => { cancelPending('Request canceled because the content changed. Try again with the updated content.'); update(previous => {
     let changed = previous;
     for (const field of Object.keys(next)) if (JSON.stringify(next[field]) !== JSON.stringify(previous.content?.[field])) changed = edit(changed, `Content: ${field}`, previous.content?.[field], next[field]);
-    const reviewPayload = { briefFields: previous.lockedBrief, brief: briefText(previous.lockedBrief), story: arcText, deliverable: DELIVERABLES.find(item => item.id === previous.deliverable)?.name, length: lengthFor(previous), duration: Number(previous.duration === 'Other' ? previous.customDuration : previous.duration), sceneCount: Number(previous.sceneCount), hashtags: previous.hashtags, emojis: previous.emojis };
+    const reviewPayload = contentReviewPayload(previous);
     const reviewed = { ...next, copyReview: { version: next.copyEngineVersion || COPY_ENGINE_VERSION, issues: [...copyIssues(next, reviewPayload), ...presentationIssues(next, reviewPayload)] } };
     return { ...changed, content: reviewed, contentLocked: false, production: null };
   }); };
   const lockContent = () => {
-    if (missingContent(content, deliverable).length || content?.copyReview?.issues?.length || !assetsComplete(project, media)) return;
+    if (missingContent(content, deliverable).length || content?.copyReview?.issues?.length || !assetsComplete(project, media) || !choicesComplete(content, deliverable === 'video')) return;
     cancelPending();
-    const baseline = [...project.aiOutputs].reverse().find(item => item.action === 'content')?.output;
-    const unchanged = JSON.stringify(content) === JSON.stringify(baseline);
-    update(previous => addEvent({ ...previous, contentLocked: true, stage: 4 }, 'Content approved', unchanged ? 'AI content accepted unchanged.' : 'AI content edited before approval.', { unchanged }));
+    let baseline = [...project.aiOutputs].reverse().find(item => item.action === 'content')?.output;
+    if (baseline && Number.isInteger(content.selectedConcept)) baseline = applyChoice(baseline, 'concept', content.selectedConcept);
+    if (baseline && Number.isInteger(content.selectedCaption)) baseline = applyChoice(baseline, 'caption', content.selectedCaption);
+    const unchanged = Boolean(baseline) && ['primaryText', 'headline', 'cta', 'visualDirection', 'altText', 'ethicalCheck', 'frames'].every(field => JSON.stringify(content[field]) === JSON.stringify(baseline[field]));
+    update(previous => addEvent({ ...previous, contentLocked: true, stage: 4 }, 'Content approved', unchanged ? (content.captionVariants ? 'AI treatments selected without copy edits.' : 'AI content accepted unchanged.') : 'AI content edited before approval.', { unchanged }));
   };
+  const chooseContent = async (kind, index) => {
+    if (busy.current || content?.[kind === 'caption' ? 'selectedCaption' : 'selectedConcept'] === index) return;
+    if ((kind === 'caption' && (content.selectedCaption != null || content.primaryText !== content.captionVariants?.[0]?.primaryText)) || (kind === 'concept' && (content.selectedConcept != null || content.frames[0].visual !== content.imageConcepts?.[0]?.visual || project.assets?.some(asset => asset?.id)))) {
+      if (!await askConfirm(kind === 'caption' ? 'Use another caption treatment? This replaces your current caption edits. The learning record keeps them.' : 'Use another image concept? This replaces the image direction, overlay and current post image. The learning record keeps your decisions.')) return;
+    }
+    cancelPending();
+    update(previous => {
+      const next = reviewChoice(applyChoice(previous.content, kind, index), previous.content, contentReviewPayload(previous));
+      const option = (kind === 'caption' ? next.captionVariants : next.imageConcepts)[index];
+      const changed = addEvent(previous, kind === 'caption' ? 'Caption treatment selected' : 'Image concept selected', `${index + 1}: ${option.label}`, { optionIndex: index, option, before: kind === 'caption' ? previous.content.primaryText : previous.content.frames[0], after: kind === 'caption' ? next.primaryText : next.frames[0] });
+      return { ...changed, content: next, ...(kind === 'concept' ? { assets: [] } : {}), contentLocked: false, production: null };
+    });
+  };
+  const explainChoice = value => update(previous => ({ ...edit(previous, 'Content selection rationale', previous.content.choiceRationale || '', value), content: { ...previous.content, choiceRationale: value } }));
   const createPackage = () => run('production', async signal => {
     const result = await requestCoach('production', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, content, platform: 'Instagram', duration: Number(project.duration === 'Other' ? project.customDuration : project.duration) }, signal);
     update({ production: result }); record('Production package created', 'Exact copy, frame / shot directions, audio and accessibility handoff.');
@@ -359,7 +377,7 @@ function App() {
               loading={loading}
             />
           )}
-          {stage === 3 && <InstagramStudio project={project} media={media} loading={loading} onSettings={updateSettings} onContent={updateContent} onGenerate={createContent} onGenerateImage={generateImage} onUpload={uploadImage} onApprove={lockContent} onEditAsset={editAsset} />}
+          {stage === 3 && <InstagramStudio project={project} media={media} loading={loading} onSettings={updateSettings} onContent={updateContent} onChoose={chooseContent} onRationale={explainChoice} onGenerate={createContent} onGenerateImage={generateImage} onUpload={uploadImage} onApprove={lockContent} onEditAsset={editAsset} />}
           {stage === 4 && <InstagramReview project={project} media={media} loading={loading} summary={learningSummary(project)} onReflection={value => { cancelPending(); update(previous => ({ ...edit(previous, 'Student reflection', previous.reflection, value), reflection: value })); }} onGenerate={createPackage} onDownload={() => downloadReport(true)} onLocalDownload={() => downloadReport(false)} onOutput={downloadOutput} onSubmission={() => downloadSubmission(true)} onLocalSubmission={() => downloadSubmission(false)} />}
 
           </div>

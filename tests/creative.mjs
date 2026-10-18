@@ -28,7 +28,7 @@ assert(config.examples.every(example => [...example.copy.split('\n')[0]].length 
 assert(!config.systemPrompt.includes('at most two written lines'));
 assert(config.editorialReview.includes("not the candidate's storyTrace"));
 assert(config.systemPrompt.includes('Never treat an earlier AI image'));
-assert.equal(config.version, '2.3.0');
+assert.equal(config.version, '2.4.0');
 assert(config.storyAdaptation.includes('INTERNAL creative guide'));
 assert(config.storyAdaptation.includes('three different openings'));
 assert(config.storyAdaptation.includes('source-story gap'));
