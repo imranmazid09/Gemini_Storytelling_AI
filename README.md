@@ -123,6 +123,15 @@ unlock and every structure selector, including browsers without native dialogs o
 ### Evidence-supported copy engine
 
 `copy-engine/v1.json` versions the prompt, safe examples, banned language and Instagram format guidance.
+Version 2.3 passes the student's selected framework into generation and editorial review. An internal
+creative guide selects the focal experience, pressure, pivotal moment and demonstrated change;
+it is not extra student work or a generated student rationale. Captions omit nonessential background,
+give the turn space and land on a supplied action before logistics. Framework-specific guidance
+preserves Three-Act, StoryBrand and Freytag differences. Video review checks scene progression,
+not just timing or caption copy. Source stories without a concrete turn are flagged for revision,
+not completed by inventing events. Existing drafts remain untouched until students replace them.
+Video timing accepts explicit second ranges and minute:second ranges; the selected studio format
+takes precedence over a brief's original format label during editorial review.
 Content develops directly from the approved story and preserves mandatory details and constraints.
 Version 2.2 keeps the existing studio and adds a standalone attention-grabbing opening, a
 five-word optional complementary overlay, and an editorial review of the actual caption/image
@@ -165,3 +174,4 @@ image reload recovery, custom duration/length, PNG exports, ZIP contents and nar
 `node tests/live-preview.mjs` is an opt-in live text and image smoke test and consumes provider usage.
 `node tests/storytelling-live.mjs` checks live captions and image concepts against six explicitly
 fictional test stories. It does not render all six images or substitute AI review for human judgment.
+Set `STORYLAB_EXTENDED=1` to include a deliberately weak source and a timed video storyboard.

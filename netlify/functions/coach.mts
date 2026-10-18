@@ -136,12 +136,15 @@ Return JSON exactly shaped as:
       return {
         systemInstruction: `${shared}
 ${copyEngine.systemPrompt}
+${copyEngine.storyAdaptation}
+Selected framework: ${payload.storyFramework || 'not specified; infer only from the supplied beats'}.
+Framework guidance: ${copyEngine.frameworks[String(payload.storyFramework) as keyof typeof copyEngine.frameworks] || 'Honor the supplied structure without assuming a three-act template.'}
 Banned phrases: ${copyEngine.bannedPhrases.join(", ")}.
 Format guidance: ${copyEngine.formats[String(payload.deliverable) as keyof typeof copyEngine.formats] || copyEngine.formats["Instagram Image Post"]}
 Craft examples (sourceStory is an example only; never borrow its events or names when absent from this student's story): ${JSON.stringify(copyEngine.examples)}
 Opening approaches, used inside the caption generation, not a separate workshop: ${JSON.stringify(copyEngine.openingApproaches)}
 Translate the student's approved story directly into the selected Instagram format. The creative brief is unchanged; the selected studio format determines this output. Apply campaign-mode standards. Preserve approved facts, mandatory details and the CTA without embellishment. Do not invent student rationale.
-Before drafting, identify this story's specific situation, pressure and change. Keep those in the caption itself. Do not reduce a character's experience to a list of program benefits or an inventory of props. Prioritize the actual narrative over the sample wording. Preserve the student's supplied third-person fictional events without presenting them as a real testimonial. The requested creative energy is ${payload.creativeEnergy || 'Lively and relatable'}; fit it to the brief's tone and context, without making serious situations frivolous.
+Use the internal guide to select, compress and stage the moment, not to summarize every beat. Do not reduce it to benefits or props. Prioritize this story over sample wording. Preserve supplied third-person fictional events without presenting them as a real testimonial. The requested creative energy is ${payload.creativeEnergy || 'Lively and relatable'}; fit it to the brief's tone and context, without making serious situations frivolous.
 For Instagram Image Post, return exactly one still-image frame centered on a decisive action or surprising juxtaposition grounded in the story. Describe viewpoint, subject action, composition and focal point. No video motion, shot sequence, timestamps or audio. Caption length must be no more than the requested word limit. Optional text overlay is at most 5 words and must add a different thought, not repeat or paraphrase the caption or CTA; leave it empty if it adds nothing. Do not default to the mandatory logistics or an oversized recruitment banner on the image. Image treatment: ${payload.visualStyle || 'candid'}. Put all required factual details in the caption even when the overlay is empty.
 For Instagram Video Storyboard, return exactly the requested sceneCount. Every scene has title, copy (the exact script or voiceover), visual (concrete action and image direction), time (consecutive start-end seconds), audio (sound direction), onScreen (optional text) and altText. The last scene ends at duration seconds. Keep speech feasible at about 2 words per second or fewer. This is a production plan, not a rendered video.
 When hashtags is false, do not add hashtags. When true, add a few relevant hashtags after the CTA on a separate line. Include emojis only when emojis is true. Never invent engagement statistics.`,
@@ -244,7 +247,7 @@ export default async function coach(req: Request, context: Context) {
         result = await ai.models.generateContent({
           model,
           contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
-          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}) },
+          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}), ...(body.action === 'content' && model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}) },
         });
       } catch (error) {
         if (!bestCopy) throw error;
@@ -274,7 +277,7 @@ export default async function coach(req: Request, context: Context) {
         try {
           const review = await ai.models.generateContent({
             model,
-            contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, format: payload.deliverable, creativeEnergy: payload.creativeEnergy, candidate: deduped.result }),
+            contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, storyFramework: payload.storyFramework, frameworkGuidance: copyEngine.frameworks[String(payload.storyFramework) as keyof typeof copyEngine.frameworks], format: payload.deliverable, creativeEnergy: payload.creativeEnergy, candidate: deduped.result }),
             config: { systemInstruction: copyEngine.editorialReview, temperature: 0.1, responseMimeType: 'application/json', abortSignal: AbortSignal.timeout(remaining()), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: model.startsWith('gemini-3.5-flash') ? ThinkingLevel.MEDIUM : ThinkingLevel.LOW } } : {}), responseJsonSchema: { type: 'object', properties: { issues: { type: 'array', items: { type: 'string' }, maxItems: 4 }, omitOverlay: { type: 'boolean' } }, required: ['issues', 'omitOverlay'], additionalProperties: false } },
           });
           const checked = JSON.parse(cleanJson(review.text || '{}'));

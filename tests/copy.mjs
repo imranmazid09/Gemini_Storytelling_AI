@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { copyIssues, COPY_ENGINE_VERSION } from '../shared/copy.mjs';
+import { copyIssues, sceneTimes, COPY_ENGINE_VERSION } from '../shared/copy.mjs';
 const briefs = JSON.parse(await fs.readFile('src/prebuilt-creative-briefs.json','utf8')).briefs;
 const examples = [
  ['Notebook down. Cooler door open.', 'Cold brew for the between-class break.', 'Find Copperline in the campus market cooler starting October 27.', 'Try a can from the cooler.'],
@@ -28,7 +28,17 @@ assert(!copyIssues(base, settings).some(issue => /hook/i.test(issue)));
 assert(copyIssues({ ...base, primaryText: base.primaryText + '\n#repair' }, settings).some(issue => issue.includes('hashtags')));
 assert(copyIssues(base, { ...settings, length: 3 }).some(issue => issue.includes('3 words')));
 assert(copyIssues({ ...base, headline: 'Twenty ideas. Zero plans.' }, settings).some(issue => issue.includes('20')), 'Spelled-out invented quantities must not bypass the approved-number check.');
+assert(!copyIssues({ ...base, headline: 'Read through one unbroken corner.' }, settings).some(issue => issue.includes('approved brief or story: 1')), 'Indefinite narrative language is not an unsupported statistic.');
+assert(copyIssues({ ...base, headline: 'A one-hour repair.' }, settings).some(issue => issue.includes('approved brief or story: 1')), 'An unsupported one-hour promise must still fail.');
+assert(!copyIssues({ ...base, headline: '1 shoreline.' }, { ...settings, story: 'A student looks toward one shoreline.' }).some(issue => issue.includes('approved brief or story: 1')), 'Written source quantities still authorize their numeric form.');
 const video = { ...base, frames: [0,1,2].map(index => ({ copy: 'A student pauses.', onScreen: '', time: `${index * 5}-${(index + 1) * 5} seconds` })) };
+assert.deepEqual(sceneTimes('0:00 - 0:07'), [0, 7]);
+assert.deepEqual(sceneTimes('1:05.5 - 1:12'), [65.5, 72]);
+assert.deepEqual(sceneTimes('0.5-7 seconds'), [0.5, 7]);
+assert.deepEqual(sceneTimes('0:65 - 1:10'), []);
+assert.deepEqual(sceneTimes('scene 1, 0-5'), []);
+const clockVideo = { ...video, frames: video.frames.map((frame, index) => ({ ...frame, time: `0:${String(index * 5).padStart(2, '0')} - 0:${String((index + 1) * 5).padStart(2, '0')}` })) };
+assert(!copyIssues(clockVideo, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 15, sceneCount: 3 }).some(issue => /consecutive|must end/.test(issue)));
 assert(!copyIssues(video, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 15, sceneCount: 3 }).some(issue => /consecutive|must end|scenes/.test(issue)));
 assert(copyIssues(video, { ...settings, deliverable: 'Instagram Video Storyboard', duration: 20, sceneCount: 3 }).some(issue => issue.includes('end at 20')));
 console.log('PASS: all six briefs, mandatory detail, unapproved numbers, banned language, caption settings and storyboard duration; no separate opening approval.');

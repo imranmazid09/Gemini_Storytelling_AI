@@ -72,6 +72,24 @@ const editorialCall = __prompts.find(prompt => prompt.config?.systemInstruction?
 assert.equal(editorialCall.config.responseJsonSchema.properties.issues.items.type, 'string');
 assert.equal(editorialCall.config.thinkingConfig.thinkingLevel, 'MEDIUM');
 assert(editorialCall.config.abortSignal instanceof AbortSignal);
+for (const framework of ['threeAct', 'storybrand', 'freytag']) {
+  globalThis.__reviews = [{ issues: [], omitOverlay: false }];
+  __responses.push(narrativeDraft);
+  const start = __prompts.length;
+  response = await coach(request({ action: 'content', payload: { ...narrativePayload, storyFramework: framework }, session }), context);
+  assert.equal(response.status, 200);
+  const calls = __prompts.slice(start);
+  assert(calls[0].config.systemInstruction.includes('Selected framework: ' + framework));
+  assert(calls[0].config.systemInstruction.includes('INTERNAL creative guide'));
+  assert.equal(calls[0].config.thinkingConfig.thinkingLevel, 'LOW', 'Drafting stays bounded while editorial review uses the more careful setting.');
+  const reviewInput = JSON.parse(calls[1].contents);
+  assert.equal(reviewInput.storyFramework, framework);
+  assert(reviewInput.frameworkGuidance.length > 50);
+}
+globalThis.__reviews = [{ issues: ['The source has no concrete turning point. Revise the approved story rather than inventing a resolution.'] }, { issues: ['The source has no concrete turning point. Revise the approved story rather than inventing a resolution.'] }];
+__responses.push(narrativeDraft, narrativeDraft);
+response = await coach(request({ action: 'content', payload: { ...narrativePayload, story: 'A reading program offers training and welcomes students.' }, session }), context);
+output = await response.json(); assert(output.copyReview.issues.some(issue => issue.includes('Revise the approved story')));
 globalThis.__reviews = [{ issues: [], omitOverlay: true }];
 __responses.push({ ...narrativeDraft, frames: [{ ...narrativeDraft.frames[0], onScreen: 'A weekly reading hour' }] });
 response = await coach(request({ action: 'content', payload: narrativePayload, session }), context); output = await response.json();

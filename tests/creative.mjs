@@ -28,4 +28,16 @@ assert(config.examples.every(example => [...example.copy.split('\n')[0]].length 
 assert(!config.systemPrompt.includes('at most two written lines'));
 assert(config.editorialReview.includes("not the candidate's storyTrace"));
 assert(config.systemPrompt.includes('Never treat an earlier AI image'));
+assert.equal(config.version, '2.3.0');
+assert(config.storyAdaptation.includes('INTERNAL creative guide'));
+assert(config.storyAdaptation.includes('three different openings'));
+assert(config.storyAdaptation.includes('source-story gap'));
+assert.deepEqual(Object.keys(config.frameworks), ['threeAct', 'storybrand', 'freytag']);
+assert(config.frameworks.storybrand.includes('not automatically the hero'));
+assert(config.frameworks.freytag.includes('aftermath'));
+assert(config.editorialReview.includes('report ABOUT a story'));
+assert(config.editorialReview.includes('The format field is authoritative'));
+assert(config.editorialReview.includes('actual scene copy or visible action'));
+assert(config.storyAdaptation.includes('NOT including every supplied fact'));
+assert(config.formats['Instagram Video Storyboard'].includes('not a brochure divided into panels'));
 console.log('PASS: legacy source-mapping diagnostics, opening/overlay checks, campaign categories, visible Do label, image treatments/text restrictions and em-dash-free export heading.');

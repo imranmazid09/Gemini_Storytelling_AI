@@ -99,6 +99,7 @@ try {
   assert(!requests.some(request => request.action === 'hooks'));
   const lastContent = requests.filter(request => request.action === 'content').at(-1);
   assert.equal(lastContent.payload.duration, 20); assert.equal(lastContent.payload.length, '75');
+  assert.equal(lastContent.payload.storyFramework, 'threeAct', 'Content generation receives the student-selected framework.');
   await page.locator('.storyboard-grid').scrollIntoViewIfNeeded(); await page.screenshot({ path: '/private/tmp/storylab-video-review.png' });
   assert.deepEqual(errors, []);
   console.log('PASS: unchanged brief selection, story-only progression, full Instagram mockup, persisted image recovery, custom caption/duration, every storyboard scene, PNG and verified/local ZIP contents, mobile layout and no hook requests.');

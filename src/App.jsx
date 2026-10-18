@@ -206,7 +206,7 @@ function App() {
     if (busy.current) return;
     if (content && !await askConfirm('Generate a replacement content draft? Current content edits and the package will be replaced; the log retains your changes.')) return;
     run('content', async signal => {
-      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform: 'Instagram', creativeEnergy: project.creativeEnergy, visualStyle: project.visualStyle, length: lengthFor(project), duration: Number(project.duration === 'Other' ? project.customDuration : project.duration), sceneCount: Number(project.sceneCount), hashtags: project.hashtags, emojis: project.emojis }, signal);
+      const result = await requestCoach('content', { brief: briefText(lockedBrief), briefFields: lockedBrief, story: arcText, storyFramework: arc, deliverable: DELIVERABLES.find(item => item.id === deliverable)?.name, platform: 'Instagram', creativeEnergy: project.creativeEnergy, visualStyle: project.visualStyle, length: lengthFor(project), duration: Number(project.duration === 'Other' ? project.customDuration : project.duration), sceneCount: Number(project.sceneCount), hashtags: project.hashtags, emojis: project.emojis }, signal);
       update({ content: result, contentLocked: false, production: null, assets: [] }); record('Content draft loaded', `Instagram ${deliverable}`);
     });
   };
