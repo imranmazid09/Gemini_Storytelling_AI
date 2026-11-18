@@ -219,7 +219,8 @@ export default async function coach(req: Request, context: Context) {
   let imageStage = 'generation';
   let imageDeadline = 0;
   try {
-    const ai = new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 1 } } });
+    // Leaving SDK retryOptions unset preserves ApiError.status for our bounded retries.
+    const ai = new GoogleGenAI({ apiKey });
     // This site's live requests can be terminated at 30 seconds. Leave time to return a safe response.
     const requestDeadline = Date.now() + 27000;
     const generateContent = (options: Parameters<typeof ai.models.generateContent>[0]) => retryTransient(
@@ -271,7 +272,7 @@ export default async function coach(req: Request, context: Context) {
         result = await generateContent({
           model,
           contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
-          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}), ...(body.action === 'content' && model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}) },
+          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}) },
         });
       } catch (error) {
         if (!bestCopy) throw error;

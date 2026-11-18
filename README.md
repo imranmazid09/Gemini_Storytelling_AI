@@ -149,8 +149,11 @@ The reliability suite covers stalled image requests, resumed tabs, late images, 
 
 Transient provider HTTP 408/500/502/503/504 errors get at most two automatic retries with short exponential
 backoff and jitter, within one shared 27-second server deadline for each AI request.
-SDK-level retries are disabled to prevent nested retry loops. Authentication, permission, billing, validation,
+SDK retryOptions are left unset: the installed SDK then preserves HTTP status codes without its own retry wrapper.
+The actual-SDK regression test covers overload recovery and permanent-error handling. Authentication, permission, billing, validation,
 safety and usage-limit errors are not automatically retried. Run `npm run test:ai-retry` for the focused tests.
+Gemini 3 drafting/coaching requests use LOW thinking for interactive latency; the separate editorial review
+retains its existing more careful setting. Story, alignment and responsibility instructions are unchanged.
 Version 2.3 passes the student's selected framework into generation and editorial review. An internal
 creative guide selects the focal experience, pressure, pivotal moment and demonstrated change;
 it is not extra student work or a generated student rationale. Captions omit nonessential background,
