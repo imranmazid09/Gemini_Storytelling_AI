@@ -272,7 +272,7 @@ export default async function coach(req: Request, context: Context) {
         result = await generateContent({
           model,
           contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
-          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}) },
+          config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: body.action === 'feedback' ? ThinkingLevel.MEDIUM : ThinkingLevel.LOW } } : {}) },
         });
       } catch (error) {
         if (!bestCopy) throw error;

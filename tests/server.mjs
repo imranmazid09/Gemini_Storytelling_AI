@@ -48,6 +48,7 @@ const feedback = { alignment: { status: 'Off brief', summary: 'Missing client ro
 __responses.push(feedback, feedback);
 response = await coach(request({ action: 'feedback', payload: { draft: 'Test draft.' }, session }), context); output = await response.json();
 assert.equal(output._cleanup, 1); assert.equal(output.beats.length, 1); assert.equal(output.storyReadiness.status, 'Revise first');
+assert.equal(__prompts.at(-1).config.thinkingConfig.thinkingLevel, 'MEDIUM', 'Story coaching retains careful reasoning for brief alignment and ethics.');
 response = await coach(request({ action: 'hooks', payload: { feedback }, session }), context); assert.equal(response.status, 400);
 __responses.push({ broken: true }, { broken: true }); response = await coach(request({ action: 'content', payload: {}, session }), context); assert.equal(response.status, 502);
 const jsonRetry = '{"broken":'; __responses.push(jsonRetry, generated); response = await coach(request({ action: 'brief', payload: {}, session }), context); assert.equal(response.status, 200);
