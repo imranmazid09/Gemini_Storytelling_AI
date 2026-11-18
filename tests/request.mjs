@@ -27,6 +27,9 @@ try {
   assert.equal(failureDetails({ code: 'IMAGE_REVIEW_UNAVAILABLE' }).failureCategory, 'image-review-unavailable');
   assert.equal(failureDetails({ code: 'IMAGE_GENERATION_UNAVAILABLE' }).failureCategory, 'image-generation-unavailable');
   assert.equal(failureDetails({ code: 'REQUEST_TIMEOUT' }).failureCategory, 'timeout');
+  assert.equal(failureDetails({ code: 'AI_USAGE_LIMIT' }).failureCategory, 'ai-usage-limit');
+  assert.equal(failureDetails({ code: 'AI_MODEL_UNAVAILABLE' }).failureCategory, 'ai-model');
+  assert.equal(failureDetails({ code: 'AI_KEY_REJECTED' }).failureCategory, 'ai-configuration');
   const unknown = failureDetails({ code: 'PRIVATE_PROVIDER_ERROR', message: 'raw provider diagnostics and secrets' });
   assert.equal(unknown.failureCategory, 'service-or-connection-error');
   assert(!JSON.stringify(unknown).includes('PRIVATE_PROVIDER_ERROR'));

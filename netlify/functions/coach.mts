@@ -7,6 +7,7 @@ import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.mjs";
 import { removeDuplicateSections } from "../../shared/response.mjs";
 import { hash, token, records, validSession } from "../lib/records.mts";
+import { aiFailure } from '../lib/ai-errors.mjs';
 
 type Action = "brief" | "feedback" | "content" | "production" | "image";
 
@@ -336,9 +337,11 @@ export default async function coach(req: Request, context: Context) {
     } catch { receiptWarning = 'AI completed, but server verification could not record this call.'; }
     return response({ ...output, _cleanup: cleanup, _receipt: receipt, _receiptWarning: receiptWarning });
   } catch (error) {
+    const failure = aiFailure(error);
     const safeDiagnostics = ['Invalid editorial review', 'Incomplete AI response', 'Invalid JSON', 'No complete AI response'];
-    console.error("StoryLab Gemini request failed", error instanceof Error && safeDiagnostics.includes(error.message) ? error.message : error instanceof Error ? error.name : "error");
+    console.error('StoryLab Gemini request failed', JSON.stringify({ action: body.action, ...(failure?.diagnostic || { reason: error instanceof Error && safeDiagnostics.includes(error.message) ? error.message : 'request_failed' }) }));
     if (body.action === 'image' && ((imageDeadline > 0 && Date.now() >= imageDeadline) || (error instanceof Error && error.name === 'TimeoutError'))) return response({ error: 'The image request timed out. Your work is safe; try again.', code: 'REQUEST_TIMEOUT' }, 504);
+    if (failure) return response({ error: failure.explanation, code: failure.code, providerStatus: failure.diagnostic.providerStatus, reason: failure.diagnostic.reason }, failure.httpStatus);
     if (body.action === 'image') return response(imageStage === 'review'
       ? { error: 'Image review is temporarily unavailable. No image-safety violation was confirmed. Your work is safe; try again.', code: 'IMAGE_REVIEW_UNAVAILABLE' }
       : { error: 'The image service is temporarily unavailable. Your work is safe; try again.', code: 'IMAGE_GENERATION_UNAVAILABLE' }, 502);

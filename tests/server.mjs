@@ -6,6 +6,7 @@ import { COPY_ENGINE_VERSION } from '../shared/copy.mjs';
 import { missingBrief, missingContent } from '../shared/brief.mjs';
 import { removeDuplicateSections, similarity } from '../shared/response.mjs';
 import { learningSummary, addEvent, freshProject, edit } from '../src/project.js';
+import { aiFailure } from '../netlify/lib/ai-errors.mjs';
 globalThis.__blobs = new Map(); globalThis.__responses = []; globalThis.__prompts = [];
 globalThis.Netlify = { env: { get: key => key === 'GEMINI_API_KEY' ? 'test-key-never-used' : undefined } };
 await build({ entryPoints: ['netlify/functions/coach.mts', 'netlify/functions/record.mts'], outdir: '.test-functions', bundle: true, platform: 'node', format: 'esm', alias: { '@google/genai': './tests/ai-mock.mjs', '@netlify/blobs': './tests/blobs-mock.mjs' } });
@@ -14,6 +15,17 @@ const { default: record } = await import('../.test-functions/record.js');
 const context = { deploy: { context: 'test' } };
 const request = data => new Request('https://test.storylab/api', { method: 'POST', body: JSON.stringify(data) });
 const session = (await (await record(request({ action: 'start' }), context)).json()).session;
+for (const [status, message, code] of [[400, 'API key not valid. private-key-value', 'AI_KEY_REJECTED'], [403, 'Forbidden private-key-value', 'AI_ACCESS_DENIED'], [402, 'Credits needed private-key-value', 'AI_BILLING_REQUIRED'], [404, 'Model not found private-key-value', 'AI_MODEL_UNAVAILABLE'], [429, 'Quota exhausted private-key-value', 'AI_USAGE_LIMIT'], [400, 'Unsupported request private-key-value', 'AI_REQUEST_REJECTED'], [503, 'Overloaded private-key-value', 'AI_PROVIDER_UNAVAILABLE']]) {
+  const error = Object.assign(new Error(message), { status });
+  assert.equal(aiFailure(error).code, code);
+  assert(!JSON.stringify(aiFailure(error)).includes('private-key-value'));
+  __responses.push(error);
+  const failed = await coach(request({ action: 'brief', payload: {}, session }), context);
+  const body = await failed.json();
+  assert.equal(body.code, code); assert.equal(body.providerStatus, status); assert(!JSON.stringify(body).includes('private-key-value'));
+}
+assert.equal(aiFailure(new Error('Private unknown error')), null);
+__prompts.length = 0;
 assert.equal(session.length, 48);
 const briefSet = JSON.parse(await fs.readFile('src/prebuilt-creative-briefs.json', 'utf8'));
 assert.equal(briefSet.briefs.length, 6); briefSet.briefs.forEach(brief => assert.deepEqual(missingBrief(brief), []));

@@ -25,6 +25,13 @@ export function startDeadline(controller, timeout) {
 }
 export function failureDetails(error) {
   const reasons = {
+    AI_KEY_REJECTED: ['ai-configuration', 'The AI provider rejected StoryLab\'s connection credential. Contact your instructor; your work is safe.'],
+    AI_BILLING_REQUIRED: ['ai-billing', 'StoryLab\'s AI account needs billing attention. Contact your instructor; your work is safe.'],
+    AI_ACCESS_DENIED: ['ai-access', 'The AI provider denied access for StoryLab. Contact your instructor; your work is safe.'],
+    AI_MODEL_UNAVAILABLE: ['ai-model', 'The AI model configured for StoryLab is unavailable. Contact your instructor; your work is safe.'],
+    AI_USAGE_LIMIT: ['ai-usage-limit', 'StoryLab has reached an AI usage or rate limit. Wait before retrying; contact your instructor if it continues. Your work is safe.'],
+    AI_REQUEST_REJECTED: ['ai-configuration', 'The AI provider rejected StoryLab\'s request settings. Contact your instructor; your work is safe.'],
+    AI_PROVIDER_UNAVAILABLE: ['ai-service', 'The AI provider is temporarily unavailable. Your work is safe; try again shortly.'],
     REQUEST_TIMEOUT: ['timeout', 'The request timed out. Your work is safe; try again.'],
     IMAGE_REVIEW_REJECTED: ['image-review-rejected', 'The image did not pass the brief and image-safety review. Try a simpler direction or upload a suitable image.'],
     IMAGE_REVIEW_UNAVAILABLE: ['image-review-unavailable', 'The image review could not finish. This is not a confirmed image-safety violation. Try generating the image again.'],
