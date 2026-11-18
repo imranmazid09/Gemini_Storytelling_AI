@@ -19,7 +19,7 @@ for (const [status, message, code] of [[400, 'API key not valid. private-key-val
   const error = Object.assign(new Error(message), { status });
   assert.equal(aiFailure(error).code, code);
   assert(!JSON.stringify(aiFailure(error)).includes('private-key-value'));
-  __responses.push(error);
+  __responses.push(...Array.from({ length: status >= 500 ? 3 : 1 }, () => error));
   const failed = await coach(request({ action: 'brief', payload: {}, session }), context);
   const body = await failed.json();
   assert.equal(body.code, code); assert.equal(body.providerStatus, status); assert(!JSON.stringify(body).includes('private-key-value'));
@@ -35,6 +35,10 @@ __responses.push({ ...generated, audience: '' }, generated);
 let response = await coach(request({ action: 'brief', payload: { previousClient: 'Old Fictional Client' }, session }), context);
 assert.equal(response.status, 200); let output = await response.json();
 assert(output._receipt); assert.equal(__prompts.length, 2);
+assert.equal(__clientOptions.httpOptions.retryOptions.attempts, 1, 'SDK retries must not multiply the bounded application retries.');
+__responses.push(Object.assign(new Error('Temporary overload'), { status: 503 }), generated);
+response = await coach(request({ action: 'brief', payload: { previousClient: 'Old Fictional Client' }, session }), context);
+assert.equal(response.status, 200); assert.equal((await response.json()).client, generated.client, 'A transient provider failure recovers without a student retry.');
 __responses.push({ ...generated, cardObjective: 'Commercial Brand' }, generated);
 response = await coach(request({ action: 'brief', payload: {}, session }), context);
 assert.equal(response.status, 200); assert.equal((await response.json()).cardObjective, generated.cardObjective);
@@ -171,6 +175,9 @@ response = await coach(request({ action: 'image', payload: { prompt: 'Hands over
 assert.equal(output.code, 'IMAGE_REVIEW_UNAVAILABLE', 'An unreadable review is not a confirmed safety rejection.');
 const timeout = new Error('Private provider timeout'); timeout.name = 'TimeoutError';
 __responses.push(timeout);
+response = await coach(request({ action: 'brief', payload: {}, session }), context); output = await response.json();
+assert.equal(response.status, 504); assert.equal(output.code, 'REQUEST_TIMEOUT');
+__responses.push(timeout);
 response = await coach(request({ action: 'image', payload: { prompt: 'Hands over a blank book.' }, session }), context); output = await response.json();
 assert.equal(response.status, 504); assert.equal(output.code, 'REQUEST_TIMEOUT');
 const originalNow = Date.now;
@@ -178,11 +185,11 @@ let now = originalNow();
 try {
   Date.now = () => now;
   const start = __prompts.length;
-  __responses.push(() => { now += 51000; return generatedImage; });
+  __responses.push(() => { now += 28000; return generatedImage; });
   response = await coach(request({ action: 'image', payload: { prompt: 'Hands over a blank book.' }, session }), context); output = await response.json();
   assert.equal(response.status, 504); assert.equal(output.code, 'REQUEST_TIMEOUT');
   assert.equal(__prompts.length - start, 1, 'An image arriving past the shared budget must not start another review or retry.');
-  __responses.push(() => { now += 51000; const error = new Error('SDK aborted'); error.name = 'AbortError'; throw error; });
+  __responses.push(() => { now += 28000; const error = new Error('SDK aborted'); error.name = 'AbortError'; throw error; });
   response = await coach(request({ action: 'image', payload: { prompt: 'Hands over a blank book.' }, session }), context); output = await response.json();
   assert.equal(output.code, 'REQUEST_TIMEOUT', 'SDK abort errors after the deadline are recorded as timeouts, not service failures.');
 } finally { Date.now = originalNow; }

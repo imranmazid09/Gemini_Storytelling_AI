@@ -8,6 +8,7 @@ import { BRIEF_FIELDS, missingBrief, missingContent } from "../../shared/brief.m
 import { removeDuplicateSections } from "../../shared/response.mjs";
 import { hash, token, records, validSession } from "../lib/records.mts";
 import { aiFailure } from '../lib/ai-errors.mjs';
+import { retryTransient } from '../lib/ai-retry.mjs';
 
 type Action = "brief" | "feedback" | "content" | "production" | "image";
 
@@ -218,13 +219,19 @@ export default async function coach(req: Request, context: Context) {
   let imageStage = 'generation';
   let imageDeadline = 0;
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { retryOptions: { attempts: 1 } } });
+    // This site's live requests can be terminated at 30 seconds. Leave time to return a safe response.
+    const requestDeadline = Date.now() + 27000;
+    const generateContent = (options: Parameters<typeof ai.models.generateContent>[0]) => retryTransient(
+      (signal: AbortSignal) => ai.models.generateContent({ ...options, config: { ...options.config, abortSignal: signal } }),
+      { deadline: requestDeadline, signal: options.config?.abortSignal },
+    );
     let output: Record<string, any> | undefined;
     if (body.action === 'image') {
       if (typeof payload.prompt !== 'string' || !payload.prompt.trim()) return response({ error: 'An approved image direction is required.', code: 'IMAGE_DIRECTION_REQUIRED' }, 400);
       const configuredModel = Netlify.env.get('GEMINI_IMAGE_MODEL');
       const imageModel = configuredModel && !configuredModel.startsWith('imagen-') ? configuredModel : 'gemini-3.1-flash-image';
-      imageDeadline = Date.now() + 50000;
+      imageDeadline = requestDeadline;
       const checkImageDeadline = () => {
         if (Date.now() < imageDeadline) return;
         const error = new Error('Image request timed out'); error.name = 'TimeoutError'; throw error;
@@ -233,13 +240,13 @@ export default async function coach(req: Request, context: Context) {
       let imageProblems = '';
       for (let attempt = 0; attempt < 2; attempt++) {
         imageStage = 'generation';
-        const generated = await ai.models.generateContent({ model: imageModel, contents: imagePrompt(payload) + (imageProblems ? `\nPrevious attempt failed review: ${imageProblems}. Use a simpler composition and completely blank surfaces.` : ''), config: { abortSignal: imageSignal(), responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
+        const generated = await generateContent({ model: imageModel, contents: imagePrompt(payload) + (imageProblems ? `\nPrevious attempt failed review: ${imageProblems}. Use a simpler composition and completely blank surfaces.` : ''), config: { abortSignal: imageSignal(), responseModalities: ['IMAGE'], imageConfig: { aspectRatio: payload.aspectRatio === '9:16' ? '9:16' : '1:1', imageSize: '1K' } } });
         checkImageDeadline();
         const image = generated.candidates?.flatMap(candidate => candidate.content?.parts || []).find(part => part.inlineData?.data && part.inlineData?.mimeType?.startsWith('image/'))?.inlineData;
         if (!image?.data) return response({ error: 'The image service did not return an image. Your work is safe; try again or upload an image.', code: 'IMAGE_GENERATION_UNAVAILABLE' }, 422);
         if (image.data.length > 5_000_000) return response({ error: 'The generated image is too large. Try again or upload an image.', code: 'IMAGE_TOO_LARGE' }, 413);
         imageStage = 'review';
-        const review = await ai.models.generateContent({ model, contents: [{ role: 'user', parts: [{ text: `Review this generated classroom campaign image against the approved direction and constraints. Direction: ${payload.prompt}. Story: ${payload.context || ''}. Brief: ${payload.brief || ''}. Fail if there are readable words or numbers on props, fabricated journals/training records/dates/named beneficiaries, unsupported claims, or child faces when prohibited. Abstract unrecognizable marks are acceptable. Also fail if it substitutes a static unrelated desk flat lay for an approved action or ignores the selected treatment ${payload.visualStyle || 'candid'}. Do not invent violations. Return JSON: {"usable":true,"issues":[]} with short specific issues when false.` }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }], config: { abortSignal: imageSignal(), responseMimeType: 'application/json', temperature: 0.1 } });
+        const review = await generateContent({ model, contents: [{ role: 'user', parts: [{ text: `Review this generated classroom campaign image against the approved direction and constraints. Direction: ${payload.prompt}. Story: ${payload.context || ''}. Brief: ${payload.brief || ''}. Fail if there are readable words or numbers on props, fabricated journals/training records/dates/named beneficiaries, unsupported claims, or child faces when prohibited. Abstract unrecognizable marks are acceptable. Also fail if it substitutes a static unrelated desk flat lay for an approved action or ignores the selected treatment ${payload.visualStyle || 'candid'}. Do not invent violations. Return JSON: {"usable":true,"issues":[]} with short specific issues when false.` }, { inlineData: { data: image.data, mimeType: image.mimeType } }] }], config: { abortSignal: imageSignal(), responseMimeType: 'application/json', temperature: 0.1 } });
         checkImageDeadline();
         const imageReview = JSON.parse(cleanJson(review.text || '{}'));
         if (typeof imageReview.usable !== 'boolean' || !Array.isArray(imageReview.issues) || imageReview.issues.some((issue: unknown) => typeof issue !== 'string')) throw new Error('Invalid image review');
@@ -255,13 +262,13 @@ export default async function coach(req: Request, context: Context) {
     let repairIssues: string[] = [];
     let previousDraft = "";
     let bestCopy: { draft: Record<string, any>; issues: string[]; cleanup: number } | undefined;
-    const contentDeadline = Date.now() + 50000;
+    const contentDeadline = requestDeadline;
     const remaining = () => Math.max(1, contentDeadline - Date.now());
     for (let attempt = 0; !output && attempt < 2; attempt++) {
       let result;
       try {
         const contentSignal = body.action === 'content' ? AbortSignal.timeout(remaining()) : undefined;
-        result = await ai.models.generateContent({
+        result = await generateContent({
           model,
           contents: prompt + (attempt ? `\nRepair these failed checks without inventing facts: ${repairIssues.join(" ") || "Return complete, clean JSON with no duplicate blocks."}. Correct only failed checks and preserve the rest. Previous draft: ${previousDraft}` : ""),
           config: { systemInstruction, temperature: attempt ? copyEngine.temperatures.repair : body.action === "content" ? copyEngine.temperatures.content : body.action === "feedback" ? 0.2 : 0.6, responseMimeType: "application/json", ...(contentSignal ? { abortSignal: contentSignal } : {}), ...(body.action === 'content' && model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}) },
@@ -299,7 +306,7 @@ export default async function coach(req: Request, context: Context) {
       // Literal source matches cannot tell whether a draft actually carries the story.
       if (body.action === 'content' && !issues.length && String(payload.deliverable || '').startsWith('Instagram ')) {
         try {
-          const review = await ai.models.generateContent({
+          const review = await generateContent({
             model,
             contents: JSON.stringify({ brief: payload.briefFields || payload.brief, story: payload.story, storyFramework: payload.storyFramework, frameworkGuidance: copyEngine.frameworks[String(payload.storyFramework) as keyof typeof copyEngine.frameworks], format: payload.deliverable, creativeEnergy: payload.creativeEnergy, ...(payload.requireChoices ? { comparisonReview: 'Review ALL three captionVariants and ' + (payload.deliverable === 'Instagram Image Post' ? 'both imageConcepts. Concepts must be meaningfully different story-grounded compositions.' : 'the actual timed storyboard scenes. Video does not require alternative image concepts.') + ' Flag generic or interchangeable variants, invented events, unsupported claims or privacy violations in any option. All options must preserve the same approved story and serve the audience. Do not demand different events when the source supplies only one moment. Optional overlays may be omitted when pairing options; do not fail on simple caption repetition that can be omitted.' } : {}), candidate: deduped.result }),
             config: { systemInstruction: copyEngine.editorialReview, temperature: 0.1, responseMimeType: 'application/json', abortSignal: AbortSignal.timeout(remaining()), ...(model.startsWith('gemini-3') ? { thinkingConfig: { thinkingLevel: model.startsWith('gemini-3.5-flash') ? ThinkingLevel.MEDIUM : ThinkingLevel.LOW } } : {}), responseJsonSchema: { type: 'object', properties: { issues: { type: 'array', items: { type: 'string' }, maxItems: 4 }, omitOverlay: { type: 'boolean' } }, required: ['issues', 'omitOverlay'], additionalProperties: false } },
@@ -340,7 +347,7 @@ export default async function coach(req: Request, context: Context) {
     const failure = aiFailure(error);
     const safeDiagnostics = ['Invalid editorial review', 'Incomplete AI response', 'Invalid JSON', 'No complete AI response'];
     console.error('StoryLab Gemini request failed', JSON.stringify({ action: body.action, ...(failure?.diagnostic || { reason: error instanceof Error && safeDiagnostics.includes(error.message) ? error.message : 'request_failed' }) }));
-    if (body.action === 'image' && ((imageDeadline > 0 && Date.now() >= imageDeadline) || (error instanceof Error && error.name === 'TimeoutError'))) return response({ error: 'The image request timed out. Your work is safe; try again.', code: 'REQUEST_TIMEOUT' }, 504);
+    if ((body.action === 'image' && imageDeadline > 0 && Date.now() >= imageDeadline) || (error instanceof Error && error.name === 'TimeoutError')) return response({ error: body.action === 'image' ? 'The image request timed out. Your work is safe; try again.' : 'AI coaching timed out. Your work is safe; try again.', code: 'REQUEST_TIMEOUT' }, 504);
     if (failure) return response({ error: failure.explanation, code: failure.code, providerStatus: failure.diagnostic.providerStatus, reason: failure.diagnostic.reason }, failure.httpStatus);
     if (body.action === 'image') return response(imageStage === 'review'
       ? { error: 'Image review is temporarily unavailable. No image-safety violation was confirmed. Your work is safe; try again.', code: 'IMAGE_REVIEW_UNAVAILABLE' }

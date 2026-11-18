@@ -16,7 +16,8 @@
     "test:requests": "node tests/request.mjs",
     "test:copy": "node tests/copy.mjs",
     "test:creative": "node tests/creative.mjs",
-    "test:choices": "node tests/choices.mjs"
+    "test:choices": "node tests/choices.mjs",
+    "test:ai-retry": "node tests/ai-retry.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.50.1",

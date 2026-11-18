@@ -140,11 +140,17 @@ not raw provider diagnostics or rejected images. Successful internal review retr
 in AI response metadata and a learning-record event. Older records cannot retroactively identify failure causes.
 
 Requests now log start time and waiting limit; failures and cancellations include elapsed time. Image generation
-and review share a 50-second backend budget, with a 55-second fetch limit and 60-second overall workspace limit.
+and review share a 27-second backend budget, below this site's observed 30-second execution cutoff,
+with a 55-second fetch limit and 60-second overall workspace limit as additional client safeguards.
 The progress panel displays elapsed time and the actual limit (70 seconds for content). Client deadlines also
 check wall time on tab resume and before accepting responses, so delayed timers cannot accept expired results.
 Browsers cannot execute a timeout while a tab is suspended; the panel states that it is checked on return.
 The reliability suite covers stalled image requests, resumed tabs, late images, cancellation and retry.
+
+Transient provider HTTP 408/500/502/503/504 errors get at most two automatic retries with short exponential
+backoff and jitter, within one shared 27-second server deadline for each AI request.
+SDK-level retries are disabled to prevent nested retry loops. Authentication, permission, billing, validation,
+safety and usage-limit errors are not automatically retried. Run `npm run test:ai-retry` for the focused tests.
 Version 2.3 passes the student's selected framework into generation and editorial review. An internal
 creative guide selects the focal experience, pressure, pivotal moment and demonstrated change;
 it is not extra student work or a generated student rationale. Captions omit nonessential background,
@@ -164,7 +170,7 @@ creative judgment, supported by a short optional self-check in the editor. Conte
 a longer browser deadline to accommodate this review; cancellation remains available.
 Repetitive optional image overlays are omitted with an explanatory note, rather than passing
 duplicate text along to the student. Students can add and edit a complementary overlay themselves.
-The server bounds content generation, review and repair to a shared 50-second model-call budget,
+The server bounds content generation, review and repair to a shared 27-second model-call budget,
 retaining a complete flagged draft if repair fails or times out.
 Source-quote mapping errors are retained as diagnostic metadata, not a submission gate:
 editorial review compares the actual caption and image direction with the approved story.
